@@ -1,0 +1,458 @@
+// FacturaPY – Prisma schema
+// NOTE: keep this schema compatible with BOTH PostgreSQL and MySQL
+// (only shared features: enums, Json, Decimal, @db.Text). Every business
+// table carries companyId so the app can become multi-tenant later.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  companyId    String?
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         String    @default("admin")
+  locale       String    @default("es")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  company      Company?  @relation(fields: [companyId], references: [id])
+  auditLogs    AuditLog[]
+
+  @@index([companyId])
+}
+
+// ── Company / fiscal configuration ──────────────────────────────────────────
+
+model Company {
+  id                   String   @id @default(cuid())
+  ruc                  String
+  dv                   String
+  razonSocial          String
+  nombreFantasia       String?
+  // JSON array of { codigo, descripcion } (SIFEN actividades económicas)
+  actividades          Json
+  timbradoNumero       String
+  timbradoFechaInicio  DateTime
+  tipoContribuyente    Int      @default(2) // 1=Física, 2=Jurídica
+  tipoRegimen          Int?     // SIFEN tipoRegimen (8=Régimen general…)
+  direccion            String
+  numeroCasa           String   @default("0")
+  complementoDireccion1 String?
+  complementoDireccion2 String?
+  departamento         Int
+  departamentoDescripcion String
+  distrito             Int
+  distritoDescripcion  String
+  ciudad               Int
+  ciudadDescripcion    String
+  telefono             String?
+  email                String?
+  logoPath             String?
+  // Digital certificate metadata (.p12 stored encrypted on disk)
+  certPath             String?
+  certPasswordEnc      String?  @db.Text
+  certExpiresAt        DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  users            User[]
+  establishments   Establishment[]
+  clients          Client[]
+  products         Product[]
+  invoices         Invoice[]
+  expenses         Expense[]
+  expenseCategories ExpenseCategory[]
+  supplierCategoryMaps SupplierCategoryMap[]
+  sifenLogs        SifenLog[]
+  auditLogs        AuditLog[]
+  settings         Setting[]
+}
+
+model Establishment {
+  id           String   @id @default(cuid())
+  companyId    String
+  codigo       String   // 3 digits, e.g. "001"
+  denominacion String?
+  direccion    String?
+  numeroCasa   String?
+  complementoDireccion1 String?
+  complementoDireccion2 String?
+  departamento Int?
+  departamentoDescripcion String?
+  distrito     Int?
+  distritoDescripcion String?
+  ciudad       Int?
+  ciudadDescripcion String?
+  telefono     String?
+  email        String?
+  createdAt    DateTime @default(now())
+
+  company          Company          @relation(fields: [companyId], references: [id])
+  expeditionPoints ExpeditionPoint[]
+
+  @@unique([companyId, codigo])
+}
+
+model ExpeditionPoint {
+  id              String   @id @default(cuid())
+  companyId       String
+  establishmentId String
+  codigo          String   // 3 digits, e.g. "001"
+  createdAt       DateTime @default(now())
+
+  establishment Establishment      @relation(fields: [establishmentId], references: [id])
+  sequences     DocumentSequence[]
+
+  @@unique([establishmentId, codigo])
+  @@index([companyId])
+}
+
+// Strictly sequential numbering per (expedition point, document type).
+// Incremented inside a transaction with a row lock — see lib/sequences.ts.
+model DocumentSequence {
+  id                String   @id @default(cuid())
+  companyId         String
+  expeditionPointId String
+  tipoDocumento     Int      // SIFEN: 1=Factura, 5=Nota de crédito, 6=Nota de débito…
+  currentNumber     Int      @default(0) // last used number (7 digits max)
+  updatedAt         DateTime @updatedAt
+
+  expeditionPoint ExpeditionPoint @relation(fields: [expeditionPointId], references: [id])
+
+  @@unique([expeditionPointId, tipoDocumento])
+  @@index([companyId])
+}
+
+// ── Clients ──────────────────────────────────────────────────────────────────
+
+enum ClientDocType {
+  RUC
+  CI
+  PASAPORTE
+  INNOMINADO
+}
+
+model Client {
+  id                String        @id @default(cuid())
+  companyId         String
+  docType           ClientDocType @default(RUC)
+  ruc               String?       // without DV
+  dv                String?
+  documentoNumero   String?       // CI / passport number
+  razonSocial       String
+  nombreFantasia    String?
+  email             String?
+  telefono          String?
+  direccion         String?
+  pais              String        @default("PRY") // SIFEN country code
+  paisDescripcion   String        @default("Paraguay")
+  isTaxpayer        Boolean       @default(true)
+  tipoContribuyente Int?          // 1=Física, 2=Jurídica
+  notes             String?       @db.Text
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  invoices Invoice[]
+
+  @@index([companyId, razonSocial])
+  @@index([companyId, ruc])
+}
+
+// ── Products / services ─────────────────────────────────────────────────────
+
+enum IvaRate {
+  IVA_10
+  IVA_5
+  EXENTA
+}
+
+enum ProductType {
+  PRODUCTO
+  SERVICIO
+}
+
+model Product {
+  id             String      @id @default(cuid())
+  companyId      String
+  codigo         String
+  descripcionEs  String
+  descripcionEn  String?
+  unidadMedida   Int         @default(77) // SIFEN unit code (77 = UNI)
+  precioUnitario Decimal     @db.Decimal(18, 4)
+  moneda         String      @default("PYG")
+  ivaRate        IvaRate     @default(IVA_10)
+  tipo           ProductType @default(PRODUCTO)
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  company Company       @relation(fields: [companyId], references: [id])
+  lines   InvoiceLine[]
+
+  @@unique([companyId, codigo])
+  @@index([companyId, descripcionEs])
+}
+
+// ── Invoices / DTE ───────────────────────────────────────────────────────────
+
+enum InvoiceStatus {
+  DRAFT
+  QUEUED
+  SENT
+  APPROVED
+  REJECTED
+  CANCELLED
+  CONTINGENCY
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  companyId      String
+  clientId       String
+  tipoDocumento  Int           @default(1) // 1=Factura, 5=Nota crédito, 6=Nota débito
+  status         InvoiceStatus @default(DRAFT)
+  cdc            String?       @unique
+  establecimiento String       // "001"
+  punto          String        // "001"
+  numero         String?       // "0000001" — assigned when emitted
+  fullNumber     String?       // "001-001-0000001"
+  securityCode   String?       // codigoSeguridadAleatorio (9 digits)
+  issueDate      DateTime
+  moneda         String        @default("PYG")
+  exchangeRate   Decimal?      @db.Decimal(18, 4)
+  // Condición de venta — SIFEN: 1=Contado, 2=Crédito
+  condicionVenta Int           @default(1)
+  creditPlazo    String?
+  creditCuotas   Int?
+  tipoTransaccion Int          @default(1)
+  descripcion    String?
+  observacion    String?       @db.Text
+  // Totals (all in document currency; PYG amounts have no decimals)
+  totalGravada10 Decimal @default(0) @db.Decimal(18, 2)
+  totalGravada5  Decimal @default(0) @db.Decimal(18, 2)
+  totalExenta    Decimal @default(0) @db.Decimal(18, 2)
+  totalIva10     Decimal @default(0) @db.Decimal(18, 2)
+  totalIva5      Decimal @default(0) @db.Decimal(18, 2)
+  totalIva       Decimal @default(0) @db.Decimal(18, 2)
+  totalDescuento Decimal @default(0) @db.Decimal(18, 2)
+  total          Decimal @default(0) @db.Decimal(18, 2)
+  // SIFEN response
+  sifenEstado          String?
+  sifenCodigoRespuesta String?
+  sifenMensaje         String? @db.Text
+  sifenProtocolo       String?
+  // Files
+  xmlPath        String?
+  signedXmlPath  String?
+  kudePath       String?
+  qrText         String? @db.Text
+  // Credit/debit note link to original document
+  originalInvoiceId String?
+  motivoNota        Int?    // SIFEN notasCreditosMotivos (1=Devolución…)
+  // Cancellation
+  cancelReason   String?
+  cancelledAt    DateTime?
+  // Lifecycle timestamps
+  emittedAt      DateTime?
+  sentAt         DateTime?
+  approvedAt     DateTime?
+  rejectedAt     DateTime?
+  contingencyAt  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company         Company       @relation(fields: [companyId], references: [id])
+  client          Client        @relation(fields: [clientId], references: [id])
+  lines           InvoiceLine[]
+  originalInvoice Invoice?      @relation("NotaOriginal", fields: [originalInvoiceId], references: [id])
+  notas           Invoice[]     @relation("NotaOriginal")
+
+  @@unique([companyId, tipoDocumento, establecimiento, punto, numero])
+  @@index([companyId, status])
+  @@index([companyId, issueDate])
+}
+
+model InvoiceLine {
+  id             String  @id @default(cuid())
+  invoiceId      String
+  productId      String?
+  orden          Int     @default(0)
+  codigo         String?
+  descripcion    String
+  unidadMedida   Int     @default(77)
+  cantidad       Decimal @db.Decimal(18, 4)
+  precioUnitario Decimal @db.Decimal(18, 4)
+  descuento      Decimal @default(0) @db.Decimal(18, 4) // per-unit discount
+  ivaTipo        Int     @default(1) // 1=Gravado, 3=Exento
+  ivaProporcion  Int     @default(100)
+  iva            Int     @default(10) // 10 | 5 | 0
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@index([invoiceId])
+}
+
+// ── Expenses / received documents ────────────────────────────────────────────
+
+enum ExpenseSource {
+  PHOTO
+  PDF
+  MANUAL
+}
+
+enum ExpenseStatus {
+  NEEDS_REVIEW
+  CONFIRMED
+}
+
+model ExpenseCategory {
+  id        String  @id @default(cuid())
+  companyId String
+  code      String
+  nameEs    String
+  nameEn    String
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  expenses Expense[]
+  supplierMaps SupplierCategoryMap[]
+
+  @@unique([companyId, code])
+}
+
+model Expense {
+  id                 String        @id @default(cuid())
+  companyId          String
+  source             ExpenseSource @default(MANUAL)
+  status             ExpenseStatus @default(NEEDS_REVIEW)
+  supplierRuc        String?
+  supplierDv         String?
+  supplierRazonSocial String?
+  timbrado           String?
+  tipoComprobante    String?       // "FACTURA", "NOTA DE CRÉDITO", "TICKET"…
+  numeroComprobante  String?       // xxx-xxx-xxxxxxx
+  fecha              DateTime?
+  gravada10          Decimal @default(0) @db.Decimal(18, 2)
+  gravada5           Decimal @default(0) @db.Decimal(18, 2)
+  exenta             Decimal @default(0) @db.Decimal(18, 2)
+  iva10              Decimal @default(0) @db.Decimal(18, 2)
+  iva5               Decimal @default(0) @db.Decimal(18, 2)
+  total              Decimal @default(0) @db.Decimal(18, 2)
+  moneda             String  @default("PYG")
+  exchangeRate       Decimal? @db.Decimal(18, 4)
+  categoryId         String?
+  filePath           String?
+  fileMime           String?
+  ocrRawJson         Json?
+  // Per-field confidence 0..1 from the OCR model, e.g. { "total": 0.98 }
+  confidence         Json?
+  duplicateOfId      String?
+  notes              String? @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  company  Company          @relation(fields: [companyId], references: [id])
+  category ExpenseCategory? @relation(fields: [categoryId], references: [id])
+
+  @@index([companyId, fecha])
+  @@index([companyId, status])
+  @@index([companyId, supplierRuc, numeroComprobante])
+}
+
+// Remembers supplier → category so the next OCR pre-selects it.
+model SupplierCategoryMap {
+  id          String @id @default(cuid())
+  companyId   String
+  supplierRuc String
+  categoryId  String
+
+  company  Company         @relation(fields: [companyId], references: [id])
+  category ExpenseCategory @relation(fields: [categoryId], references: [id])
+
+  @@unique([companyId, supplierRuc])
+}
+
+// ── Job queue (DB-backed, no Redis) ─────────────────────────────────────────
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+model JobQueue {
+  id          String    @id @default(cuid())
+  type        String    // send_dte | query_status | generate_kude | cancel_dte | backup
+  payload     Json
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(8)
+  nextRunAt   DateTime  @default(now())
+  lastError   String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, nextRunAt])
+}
+
+// ── SIFEN raw request/response log (audit & debugging) ──────────────────────
+
+model SifenLog {
+  id          String   @id @default(cuid())
+  companyId   String?
+  invoiceId   String?
+  operation   String   // generateXml | signXml | send | queryStatus | queryRuc | cancel | generateQr
+  mode        String   // mock | test | production
+  requestXml  String?  @db.Text
+  responseXml String?  @db.Text
+  success     Boolean?
+  detail      String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@index([invoiceId])
+  @@index([createdAt])
+}
+
+// ── Audit log ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  companyId String?
+  userId    String?
+  action    String   // create | update | delete | emit | cancel | login…
+  entity    String   // invoice | client | product | expense | settings…
+  entityId  String?
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  company Company? @relation(fields: [companyId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
+
+  @@index([companyId, createdAt])
+}
+
+// ── Key-value settings (per company) ─────────────────────────────────────────
+
+model Setting {
+  id        String @id @default(cuid())
+  companyId String
+  key       String
+  value     String @db.Text
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, key])
+}
