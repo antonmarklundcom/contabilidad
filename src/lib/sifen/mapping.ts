@@ -96,7 +96,8 @@ export function buildInvoiceData(invoice: InvoiceWithRelations): InvoiceData {
       precioUnitario: Number(l.precioUnitario),
       descuento: Number(l.descuento) || 0,
       ivaTipo: l.ivaTipo, // 1=Gravado IVA, 3=Exento, 4=Gravado parcial
-      ivaProporcion: l.ivaProporcion,
+      // SIFEN: exento (ivaTipo 3) must carry ivaProporcion 0.
+      ivaProporcion: l.ivaTipo === 3 ? 0 : l.ivaProporcion,
       iva: l.iva,
     }));
 
