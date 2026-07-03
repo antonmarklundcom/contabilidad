@@ -5,7 +5,7 @@
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 import { prisma } from "@/lib/prisma";
 import { storageDir, storageRoot } from "@/lib/storage";
 import { enqueueJob } from "@/lib/jobs/queue";
@@ -21,7 +21,7 @@ export async function createBackup(): Promise<string> {
 
   await new Promise<void>((resolve, reject) => {
     const output = fs.createWriteStream(zipPath);
-    const archive = archiver("zip", { zlib: { level: 6 } });
+    const archive = new ZipArchive({ zlib: { level: 6 } });
     output.on("close", () => resolve());
     archive.on("error", reject);
     archive.pipe(output);

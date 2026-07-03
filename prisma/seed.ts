@@ -300,7 +300,7 @@ async function main() {
             numero: num,
             tipoContribuyente: 2,
             fecha: issueDate,
-            tipoEmision: status === "CONTINGENCY" ? 2 : 1,
+            tipoEmision: 1,
             codigoSeguridad: securityCode,
           })
         : null;
