@@ -125,3 +125,38 @@ export async function changePassword(newPassword: string): Promise<Result> {
   await audit("update", "settings", session.user.companyId ?? undefined, { section: "password" });
   return { ok: true };
 }
+
+export async function createUser(input: {
+  name: string;
+  email: string;
+  password: string;
+}): Promise<Result> {
+  const name = input.name.trim();
+  const email = input.email.trim().toLowerCase();
+  if (!name) return { ok: false, error: "name_required" };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "invalid_email" };
+  if (input.password.length < 8) return { ok: false, error: "too_short" };
+
+  const companyId = await getCompanyId();
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) return { ok: false, error: "email_in_use" };
+
+  const passwordHash = await bcrypt.hash(input.password, 12);
+  const created = await prisma.user.create({
+    data: { name, email, passwordHash, companyId },
+  });
+  await audit("create", "user", created.id, { section: "users" });
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function deleteUser(userId: string): Promise<Result> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return { ok: false, error: "unauthorized" };
+  if (session.user.id === userId) return { ok: false, error: "cannot_delete_self" };
+  const companyId = await getCompanyId();
+  await prisma.user.deleteMany({ where: { id: userId, companyId } });
+  await audit("delete", "user", userId, { section: "users" });
+  revalidatePath("/settings");
+  return { ok: true };
+}

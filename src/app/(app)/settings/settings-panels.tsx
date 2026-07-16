@@ -21,8 +21,10 @@ import {
   setSequenceNumber,
   testSmtpAction,
   changePassword,
+  createUser,
+  deleteUser,
 } from "./actions";
-import { Loader2, CheckCircle2, Upload, Info } from "lucide-react";
+import { Loader2, CheckCircle2, Upload, Info, Trash2, Plus } from "lucide-react";
 
 const DOC_LABELS: Record<number, string> = { 1: "Factura", 5: "Nota de crédito", 6: "Nota de débito" };
 
@@ -335,6 +337,136 @@ export function BackupPanel({
             </Table>
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Users ────────────────────────────────────────────────────────────────────
+
+export interface UserRow {
+  id: string;
+  name: string;
+  email: string;
+  isYou: boolean;
+}
+
+export function UsersPanel({ users }: { users: UserRow[] }) {
+  const { t } = useI18n();
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const errorText: Record<string, string> = {
+    invalid_email: t("common.error"),
+    email_in_use: t("settings.userEmailInUse"),
+    too_short: t("common.error"),
+    name_required: t("common.required"),
+    cannot_delete_self: t("settings.cannotDeleteSelf"),
+  };
+
+  async function add() {
+    setBusy(true);
+    setMsg(null);
+    const res = await createUser({ name, email, password });
+    setBusy(false);
+    if (res.ok) {
+      setName("");
+      setEmail("");
+      setPassword("");
+      setMsg({ ok: true, text: t("settings.userCreated") });
+      router.refresh();
+    } else {
+      setMsg({ ok: false, text: errorText[res.error] ?? t("common.error") });
+    }
+  }
+
+  async function remove(id: string) {
+    if (!confirm(t("settings.deleteUserConfirm"))) return;
+    const res = await deleteUser(id);
+    if (!res.ok) {
+      setMsg({ ok: false, text: errorText[res.error] ?? t("common.error") });
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("settings.users")}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("settings.userName")}</TableHead>
+                <TableHead>{t("settings.userEmail")}</TableHead>
+                <TableHead className="w-16" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell>
+                    {u.name}
+                    {u.isYou && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        ({t("settings.userYou")})
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                  <TableCell>
+                    {!u.isYou && (
+                      <Button variant="ghost" size="icon" onClick={() => remove(u.id)}>
+                        <Trash2 className="text-muted-foreground" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="space-y-3 border-t pt-4">
+          <Label className="text-sm font-medium">{t("settings.newUser")}</Label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Input placeholder={t("settings.userName")} value={name} onChange={(e) => setName(e.target.value)} />
+            <Input
+              type="email"
+              placeholder={t("settings.userEmail")}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <Input
+              type="password"
+              placeholder={t("settings.newPassword")}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={add}
+              disabled={busy || !name || !email || password.length < 8}
+            >
+              {busy ? <Loader2 className="animate-spin" /> : <Plus />}
+              {t("settings.addUser")}
+            </Button>
+            {msg && (
+              <span className={msg.ok ? "text-sm text-emerald-700" : "text-sm text-destructive"}>
+                {msg.text}
+              </span>
+            )}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

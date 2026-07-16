@@ -4,6 +4,8 @@ import { getT } from "@/lib/i18n-server";
 import { getSifenMode } from "@/lib/sifen";
 import { smtpConfigured } from "@/lib/mailer";
 import { listBackups } from "@/lib/backup";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CompanyForm, type CompanyValues } from "./company-form";
@@ -13,14 +15,27 @@ import {
   SifenModePanel,
   SmtpPanel,
   BackupPanel,
+  UsersPanel,
   PasswordPanel,
   type SequenceRow,
+  type UserRow,
 } from "./settings-panels";
 
 export default async function SettingsPage() {
   const { t } = await getT();
   const companyId = await getCompanyId();
   const company = await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+  const session = await getServerSession(authOptions);
+  const companyUsers = await prisma.user.findMany({
+    where: { companyId },
+    orderBy: { createdAt: "asc" },
+  });
+  const users: UserRow[] = companyUsers.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    isYou: u.id === session?.user?.id,
+  }));
 
   const points = await prisma.expeditionPoint.findMany({
     where: { companyId },
@@ -97,7 +112,8 @@ export default async function SettingsPage() {
         <TabsContent value="backup">
           <BackupPanel backups={backups} />
         </TabsContent>
-        <TabsContent value="users">
+        <TabsContent value="users" className="space-y-6">
+          <UsersPanel users={users} />
           <PasswordPanel />
         </TabsContent>
       </Tabs>
