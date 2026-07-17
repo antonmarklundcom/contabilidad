@@ -18,6 +18,27 @@ const confidence = () =>
     .number()
     .describe("Confianza 0..1 de que el valor extraído es correcto");
 
+export const receiptItemSchema = z.object({
+  descripcion: z.string().describe("Descripción del ítem tal como aparece"),
+  cantidad: z.number().nullable().describe("Cantidad, si aparece"),
+  total: z
+    .number()
+    .describe("Importe total del ítem CON IVA incluido, tal como está impreso"),
+  tasa: z
+    .number()
+    .describe("Tasa de IVA del ítem: 10, 5 o 0 (exenta), según la columna del comprobante"),
+  deducibilidadSugerida: z
+    .number()
+    .describe(
+      "Sugerencia 0..100 de qué % del IVA de este ítem sería deducible como crédito fiscal para la actividad del contribuyente (0 = consumo personal, 100 = claramente afectado a la actividad gravada). Es solo una sugerencia — el usuario decide."
+    ),
+  motivoDeducibilidad: z
+    .string()
+    .nullable()
+    .describe("Motivo breve de la sugerencia de deducibilidad (máx 120 caracteres)"),
+  confianza: confidence(),
+});
+
 export const receiptSchema = z.object({
   rucEmisor: z
     .string()
@@ -39,6 +60,12 @@ export const receiptSchema = z.object({
     .string()
     .nullable()
     .describe("Resumen corto de los ítems comprados (máx 200 caracteres)"),
+  items: z
+    .array(receiptItemSchema)
+    .nullable()
+    .describe(
+      "Ítems del comprobante, uno por línea impresa. Si el detalle no es legible, devolvé null — nunca inventes ítems."
+    ),
   gravada10: z.number().nullable().describe("Subtotal gravado al 10% (base sin IVA... según como lo exprese el comprobante; si el comprobante muestra 'Gravadas 10%' usá ese número)"),
   gravada5: z.number().nullable().describe("Subtotal gravado al 5%"),
   exenta: z.number().nullable().describe("Subtotal exento"),
@@ -78,6 +105,14 @@ Extraé EXACTAMENTE lo que aparece en la imagen o PDF — nunca inventes ni calc
 Si un campo no se ve o no existe, devolvé null y confianza baja.
 Los montos en guaraníes no llevan decimales. El número de comprobante tiene el formato xxx-xxx-xxxxxxx.
 El RUC paraguayo tiene hasta 8 dígitos más un dígito verificador después del guión.
+
+Ítems: transcribí cada línea del detalle con su importe CON IVA y su tasa (10, 5 o 0) según la columna en la que aparece.
+
+Deducibilidad (deducibilidadSugerida): según la Ley 6380/19, solo el IVA de compras afectadas a la actividad gravada del contribuyente genera crédito fiscal. Sugerí por ítem:
+- 100 → claramente afectado a la actividad (insumos, mercadería, servicios del negocio)
+- 0 → claramente personal (consumo propio, regalos, ocio)
+- valores intermedios cuando el uso es mixto o dudoso (ej: 50 para combustible de un vehículo de uso mixto)
+Es SOLO una sugerencia con su motivo — la decisión final es del usuario.
 Respondé únicamente con el JSON pedido.`;
 
 export function anthropicConfigured(): boolean {
@@ -86,7 +121,8 @@ export function anthropicConfigured(): boolean {
 
 export async function extractReceipt(
   file: Buffer,
-  mimeType: string
+  mimeType: string,
+  context?: { actividades?: string[] }
 ): Promise<OcrResult> {
   if (!anthropicConfigured()) {
     throw new Error("ANTHROPIC_API_KEY is not configured");
@@ -120,7 +156,11 @@ export async function extractReceipt(
           mediaBlock,
           {
             type: "text",
-            text: "Extraé los datos de este comprobante paraguayo con la confianza por campo.",
+            text:
+              "Extraé los datos de este comprobante paraguayo con la confianza por campo." +
+              (context?.actividades?.length
+                ? ` Actividades económicas del contribuyente que recibe el comprobante (para la sugerencia de deducibilidad): ${context.actividades.join("; ")}.`
+                : ""),
           },
         ],
       },
@@ -155,6 +195,12 @@ export function validateExtraction(e: ReceiptExtraction): string[] {
     // Tolerate rounding: 1 unit per component for PYG, 0.05 for USD.
     const tolerance = e.moneda === "USD" ? 0.06 : 5;
     if (diff > tolerance) warnings.push("totals_mismatch");
+  }
+
+  if (e.items && e.items.length > 0 && e.total !== null) {
+    const sum = e.items.reduce((acc, it) => acc + (it.total ?? 0), 0);
+    const tolerance = e.moneda === "USD" ? 0.06 : 5;
+    if (Math.abs(sum - e.total) > tolerance) warnings.push("items_mismatch");
   }
 
   if (e.fecha) {

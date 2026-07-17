@@ -10,17 +10,25 @@ const HEADERS = [
   "fecha", "tipo", "numero", "timbrado", "ruc", "razon_social",
   "gravada_10", "gravada_5", "exenta", "iva_10", "iva_5", "total",
 ];
+const COMPRAS_HEADERS = [...HEADERS.slice(0, -1), "iva_deducible", "total"];
 
-function rowValues(r: LibroRow): (string | number)[] {
+function rowValues(r: LibroRow, compras: boolean): (string | number)[] {
   return [
     r.fecha ? r.fecha.toISOString().slice(0, 10) : "",
     r.tipo, r.numero, r.timbrado, r.ruc, r.razonSocial,
-    r.gravada10, r.gravada5, r.exenta, r.iva10, r.iva5, r.total,
+    r.gravada10, r.gravada5, r.exenta, r.iva10, r.iva5,
+    ...(compras ? [r.ivaDeducible ?? 0] : []),
+    r.total,
   ];
 }
 
-function totalsRow(t: LibroTotals): (string | number)[] {
-  return ["TOTALES", "", "", "", "", "", t.gravada10, t.gravada5, t.exenta, t.iva10, t.iva5, t.total];
+function totalsRow(t: LibroTotals, compras: boolean): (string | number)[] {
+  return [
+    "TOTALES", "", "", "", "", "",
+    t.gravada10, t.gravada5, t.exenta, t.iva10, t.iva5,
+    ...(compras ? [t.ivaDeducible] : []),
+    t.total,
+  ];
 }
 
 export async function GET(req: Request) {
@@ -37,10 +45,12 @@ export async function GET(req: Request) {
     ? await libroVentas(companyId, year, month)
     : await libroCompras(companyId, year, month);
 
+  const compras = book === "compras";
+  const headers = compras ? COMPRAS_HEADERS : HEADERS;
   const name = `libro-iva-${book}-${year}-${String(month).padStart(2, "0")}`;
 
   if (format === "xlsx") {
-    const aoa = [HEADERS, ...data.rows.map(rowValues), totalsRow(data.totals)];
+    const aoa = [headers, ...data.rows.map((r) => rowValues(r, compras)), totalsRow(data.totals, compras)];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, book === "ventas" ? "Ventas" : "Compras");
@@ -53,6 +63,6 @@ export async function GET(req: Request) {
     });
   }
 
-  const csv = toCsv(HEADERS, [...data.rows.map(rowValues), totalsRow(data.totals)]);
+  const csv = toCsv(headers, [...data.rows.map((r) => rowValues(r, compras)), totalsRow(data.totals, compras)]);
   return csvResponse(`${name}.csv`, csv);
 }

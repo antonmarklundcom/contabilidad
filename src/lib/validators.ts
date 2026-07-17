@@ -97,6 +97,16 @@ export type ProductInput = z.infer<typeof productSchema>;
 export type InvoiceInput = z.infer<typeof invoiceSchema>;
 export type InvoiceLineInput = z.infer<typeof invoiceLineSchema>;
 
+export const expenseItemSchema = z.object({
+  descripcion: z.string().trim().min(1).max(300),
+  cantidad: z.coerce.number().positive().optional(),
+  total: z.coerce.number().nonnegative(),
+  tasa: z.coerce.number().refine((v) => [10, 5, 0].includes(v)),
+  deduciblePercent: z.coerce.number().int().min(0).max(100).default(100),
+  deducibleReason: z.string().trim().max(300).optional().or(z.literal("")),
+  aiSuggested: z.boolean().default(false),
+});
+
 export const expenseSchema = z.object({
   supplierRuc: z.string().trim().regex(/^[0-9]{1,8}$/).optional().or(z.literal("")),
   supplierDv: z.string().trim().regex(/^[0-9]$/).optional().or(z.literal("")),
@@ -112,8 +122,11 @@ export const expenseSchema = z.object({
   iva5: z.coerce.number().nonnegative().default(0),
   total: z.coerce.number().nonnegative().default(0),
   moneda: z.enum(["PYG", "USD"]).default("PYG"),
+  deduciblePercent: z.coerce.number().int().min(0).max(100).default(100),
+  items: z.array(expenseItemSchema).default([]),
   categoryId: z.string().optional().or(z.literal("")),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 
 export type ExpenseInput = z.infer<typeof expenseSchema>;
+export type ExpenseItemInput = z.infer<typeof expenseItemSchema>;

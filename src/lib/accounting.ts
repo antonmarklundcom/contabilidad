@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { computeDeducible } from "@/lib/deductibility";
 
 export interface LibroRow {
   id: string;
@@ -14,6 +15,10 @@ export interface LibroRow {
   iva10: number;
   iva5: number;
   total: number;
+  /** Compras only — creditable IVA per rate (see lib/deductibility.ts). */
+  ivaDeducible10?: number;
+  ivaDeducible5?: number;
+  ivaDeducible?: number;
 }
 
 export interface LibroTotals {
@@ -23,10 +28,23 @@ export interface LibroTotals {
   iva10: number;
   iva5: number;
   total: number;
+  ivaDeducible10: number;
+  ivaDeducible5: number;
+  ivaDeducible: number;
 }
 
 function emptyTotals(): LibroTotals {
-  return { gravada10: 0, gravada5: 0, exenta: 0, iva10: 0, iva5: 0, total: 0 };
+  return {
+    gravada10: 0,
+    gravada5: 0,
+    exenta: 0,
+    iva10: 0,
+    iva5: 0,
+    total: 0,
+    ivaDeducible10: 0,
+    ivaDeducible5: 0,
+    ivaDeducible: 0,
+  };
 }
 
 function sumRows(rows: LibroRow[]): LibroTotals {
@@ -38,6 +56,9 @@ function sumRows(rows: LibroRow[]): LibroTotals {
     t.iva10 += r.iva10;
     t.iva5 += r.iva5;
     t.total += r.total;
+    t.ivaDeducible10 += r.ivaDeducible10 ?? r.iva10;
+    t.ivaDeducible5 += r.ivaDeducible5 ?? r.iva5;
+    t.ivaDeducible += r.ivaDeducible ?? r.iva10 + r.iva5;
   }
   return t;
 }
@@ -106,22 +127,39 @@ export async function libroCompras(
       fecha: { gte: start, lte: end },
     },
     orderBy: { fecha: "asc" },
+    include: { items: true },
   });
-  const rows: LibroRow[] = expenses.map((e) => ({
-    id: e.id,
-    fecha: e.fecha,
-    tipo: e.tipoComprobante ?? "Factura",
-    numero: e.numeroComprobante ?? "",
-    timbrado: e.timbrado ?? "",
-    ruc: e.supplierRuc ? `${e.supplierRuc}-${e.supplierDv ?? ""}` : "",
-    razonSocial: e.supplierRazonSocial ?? "",
-    gravada10: Number(e.gravada10),
-    gravada5: Number(e.gravada5),
-    exenta: Number(e.exenta),
-    iva10: Number(e.iva10),
-    iva5: Number(e.iva5),
-    total: Number(e.total),
-  }));
+  const rows: LibroRow[] = expenses.map((e) => {
+    const deducible = computeDeducible({
+      iva10: Number(e.iva10),
+      iva5: Number(e.iva5),
+      deduciblePercent: e.deduciblePercent,
+      moneda: e.moneda,
+      items: e.items.map((item) => ({
+        total: Number(item.total),
+        tasa: item.tasa,
+        deduciblePercent: item.deduciblePercent,
+      })),
+    });
+    return {
+      id: e.id,
+      fecha: e.fecha,
+      tipo: e.tipoComprobante ?? "Factura",
+      numero: e.numeroComprobante ?? "",
+      timbrado: e.timbrado ?? "",
+      ruc: e.supplierRuc ? `${e.supplierRuc}-${e.supplierDv ?? ""}` : "",
+      razonSocial: e.supplierRazonSocial ?? "",
+      gravada10: Number(e.gravada10),
+      gravada5: Number(e.gravada5),
+      exenta: Number(e.exenta),
+      iva10: Number(e.iva10),
+      iva5: Number(e.iva5),
+      total: Number(e.total),
+      ivaDeducible10: deducible.ivaDeducible10,
+      ivaDeducible5: deducible.ivaDeducible5,
+      ivaDeducible: deducible.ivaDeducible,
+    };
+  });
   return { rows, totals: sumRows(rows) };
 }
 
@@ -152,7 +190,8 @@ export async function dashboardData(
     prisma.expense.count({ where: { companyId, status: "NEEDS_REVIEW" } }),
   ]);
   const ivaDebito = ventas.totals.iva10 + ventas.totals.iva5;
-  const ivaCredito = compras.totals.iva10 + compras.totals.iva5;
+  // Only the deducible part of purchase IVA is fiscal credit.
+  const ivaCredito = compras.totals.ivaDeducible;
   return {
     incomeThisMonth: ventas.totals.total,
     expensesThisMonth: compras.totals.total,

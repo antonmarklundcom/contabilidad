@@ -16,10 +16,12 @@ export function LibroTable({
   rows,
   totals,
   moneda = "PYG",
+  showDeducible = false,
 }: {
   rows: LibroRow[];
   totals: LibroTotals;
   moneda?: string;
+  showDeducible?: boolean;
 }) {
   const { t, money, date } = useI18n();
 
@@ -47,6 +49,9 @@ export function LibroTable({
             <TableHead className="text-right">{t("books.exentas")}</TableHead>
             <TableHead className="text-right">{t("books.iva10")}</TableHead>
             <TableHead className="text-right">{t("books.iva5")}</TableHead>
+            {showDeducible && (
+              <TableHead className="text-right">{t("books.ivaDeducible")}</TableHead>
+            )}
             <TableHead className="text-right">{t("books.total")}</TableHead>
           </TableRow>
         </TableHeader>
@@ -66,6 +71,11 @@ export function LibroTable({
               <TableCell className="text-right tabular-nums">{money(r.exenta, moneda)}</TableCell>
               <TableCell className="text-right tabular-nums">{money(r.iva10, moneda)}</TableCell>
               <TableCell className="text-right tabular-nums">{money(r.iva5, moneda)}</TableCell>
+              {showDeducible && (
+                <TableCell className="text-right tabular-nums">
+                  {money(r.ivaDeducible ?? 0, moneda)}
+                </TableCell>
+              )}
               <TableCell className="text-right font-medium tabular-nums">
                 {money(r.total, moneda)}
               </TableCell>
@@ -92,6 +102,11 @@ export function LibroTable({
             <TableCell className="text-right font-semibold tabular-nums">
               {money(totals.iva5, moneda)}
             </TableCell>
+            {showDeducible && (
+              <TableCell className="text-right font-semibold tabular-nums">
+                {money(totals.ivaDeducible, moneda)}
+              </TableCell>
+            )}
             <TableCell className="text-right font-semibold tabular-nums">
               {money(totals.total, moneda)}
             </TableCell>

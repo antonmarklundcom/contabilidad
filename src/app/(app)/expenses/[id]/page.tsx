@@ -14,7 +14,10 @@ export default async function ExpenseReviewPage({
   const { t, locale } = await getT();
   const { id } = await params;
   const companyId = await getCompanyId();
-  const expense = await prisma.expense.findFirst({ where: { id, companyId } });
+  const expense = await prisma.expense.findFirst({
+    where: { id, companyId },
+    include: { items: { orderBy: { orden: "asc" } } },
+  });
   if (!expense) notFound();
 
   const categories = await loadCategories(locale);
@@ -43,6 +46,16 @@ export default async function ExpenseReviewPage({
           iva5: Number(expense.iva5),
           total: Number(expense.total),
           moneda: expense.moneda as "PYG" | "USD",
+          deduciblePercent: expense.deduciblePercent,
+          items: expense.items.map((item) => ({
+            descripcion: item.descripcion,
+            cantidad: item.cantidad ? Number(item.cantidad) : undefined,
+            total: Number(item.total),
+            tasa: item.tasa,
+            deduciblePercent: item.deduciblePercent,
+            deducibleReason: item.deducibleReason ?? "",
+            aiSuggested: item.aiSuggested,
+          })),
           categoryId: expense.categoryId ?? "",
           notes: expense.notes ?? "",
         }}

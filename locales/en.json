@@ -53,7 +53,8 @@
     "books": "VAT books",
     "reports": "Reports",
     "settings": "Settings",
-    "logout": "Log out"
+    "logout": "Log out",
+    "taxes": "Taxes"
   },
   "env": {
     "mock": "MOCK",
@@ -290,7 +291,25 @@
     "sourceMANUAL": "Manual",
     "viewFile": "View receipt",
     "noApiKey": "ANTHROPIC_API_KEY is not set — automatic extraction is disabled. You can still enter the expense manually.",
-    "deleteConfirm": "Delete this expense?"
+    "deleteConfirm": "Delete this expense?",
+    "items": "Receipt items",
+    "addItem": "Add item",
+    "noItemsHint": "No items loaded: a single deductibility % applies to the whole expense.",
+    "deduciblePercent": "% deductible",
+    "itemDescription": "Description",
+    "itemTasa": "Rate",
+    "deducibleShort": "% deductible",
+    "ivaDeducible": "Deductible VAT",
+    "ivaNoDeducible": "Non-deductible VAT",
+    "ivaDeducibleTotal": "Total deductible VAT",
+    "itemsMismatch": "The sum of the items does not match the receipt total",
+    "exenta": "Exempt",
+    "importMarangatu": "Import from Marangatu",
+    "importTitle": "Import receipts from Marangatu",
+    "importHint": "Upload the electronic/virtual receipts CSV/XLSX exported from Marangatu ('Consulta de comprobantes'). Duplicates are detected automatically by RUC + number + date + total.",
+    "importFile": "CSV or XLSX file",
+    "importSubmit": "Import",
+    "importResult": "{created} expenses created, {skipped} duplicates skipped, {errors} rows with errors"
   },
   "books": {
     "title": "VAT books",
@@ -313,7 +332,8 @@
     "total": "Total",
     "totals": "Month totals",
     "onlyApproved": "Only approved documents and confirmed expenses are included",
-    "emptyMonth": "No activity in this month"
+    "emptyMonth": "No activity in this month",
+    "ivaDeducible": "Deductible VAT"
   },
   "reports": {
     "title": "Reports",
@@ -404,5 +424,24 @@
     "fieldIva5": "VAT 5%",
     "fieldTotal": "Total",
     "fieldMoneda": "Currency"
+  },
+  "taxes": {
+    "title": "Taxes",
+    "form120": "Form 120 (monthly VAT)",
+    "form120Hint": "Working draft — not the official form. Load these figures into Marangatu.",
+    "debitoFiscal": "Tax debit",
+    "creditoFiscal": "Tax credit",
+    "saldoAnterior": "Previous period credit balance",
+    "saldoAnteriorHint": "Manually enter the credit balance carried over from the previous Form 120.",
+    "resultado": "Period result",
+    "aPagar": "VAT to pay",
+    "saldoAFavor": "Credit balance for next period",
+    "downloadForm120": "Download Form 120 draft (PDF)",
+    "downloadReport": "Download monthly report (PDF)",
+    "ventasSection": "Sales (tax debit)",
+    "comprasSection": "Purchases (deductible tax credit)",
+    "ivaNoDeducible": "Non-deductible VAT (to cost)",
+    "documentCounts": "{ventas} sales · {compras} purchases",
+    "saved": "Saved"
   }
 }

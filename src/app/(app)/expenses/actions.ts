@@ -75,22 +75,46 @@ export async function saveExpense(
     iva5: d.iva5,
     total: d.total,
     moneda: d.moneda,
+    deduciblePercent: d.deduciblePercent,
     categoryId: d.categoryId || null,
     notes: d.notes || null,
     duplicateOfId,
     status: opts?.confirm ? ("CONFIRMED" as const) : undefined,
   };
 
+  const itemsData = d.items.map((item, i) => ({
+    orden: i,
+    descripcion: item.descripcion,
+    cantidad: item.cantidad ?? null,
+    total: item.total,
+    tasa: item.tasa,
+    deduciblePercent: item.deduciblePercent,
+    deducibleReason: item.deducibleReason || null,
+    aiSuggested: item.aiSuggested,
+  }));
+
   let expenseId: string;
   if (id) {
     const existing = await prisma.expense.findFirst({ where: { id, companyId } });
     if (!existing) return { ok: false, errors: { _: "not_found" } };
-    await prisma.expense.update({ where: { id }, data });
+    await prisma.$transaction([
+      prisma.expense.update({ where: { id }, data }),
+      prisma.expenseItem.deleteMany({ where: { expenseId: id } }),
+      prisma.expenseItem.createMany({
+        data: itemsData.map((item) => ({ ...item, expenseId: id })),
+      }),
+    ]);
     expenseId = id;
     await audit("update", "expense", id);
   } else {
     const created = await prisma.expense.create({
-      data: { ...data, companyId, source: "MANUAL", status: opts?.confirm ? "CONFIRMED" : "NEEDS_REVIEW" },
+      data: {
+        ...data,
+        companyId,
+        source: "MANUAL",
+        status: opts?.confirm ? "CONFIRMED" : "NEEDS_REVIEW",
+        items: { create: itemsData },
+      },
     });
     expenseId = created.id;
     await audit("create", "expense", created.id);
@@ -124,4 +148,49 @@ export async function categoryForSupplier(supplierRuc: string): Promise<string |
     where: { companyId_supplierRuc: { companyId, supplierRuc } },
   });
   return map?.categoryId ?? null;
+}
+
+/** Bulk-imports pre-parsed Marangatu rows as CONFIRMED expenses (no OCR needed — already structured). */
+export async function importMarangatuRows(
+  rows: import("@/lib/marangatu-import").MarangatuRow[]
+): Promise<{ created: number; skipped: number }> {
+  const companyId = await getCompanyId();
+  let created = 0;
+  let skipped = 0;
+
+  for (const r of rows) {
+    const dup = await findDuplicate(companyId, r.supplierRuc, r.numeroComprobante, r.fecha, r.total);
+    if (dup) {
+      skipped++;
+      continue;
+    }
+    const suggestedCategory = r.supplierRuc ? await categoryForSupplier(r.supplierRuc) : null;
+    await prisma.expense.create({
+      data: {
+        companyId,
+        source: "IMPORT",
+        status: "NEEDS_REVIEW",
+        supplierRuc: r.supplierRuc,
+        supplierDv: r.supplierDv,
+        supplierRazonSocial: r.supplierRazonSocial,
+        timbrado: r.timbrado,
+        tipoComprobante: r.tipoComprobante,
+        numeroComprobante: r.numeroComprobante,
+        fecha: r.fecha,
+        gravada10: r.gravada10,
+        gravada5: r.gravada5,
+        exenta: r.exenta,
+        iva10: r.iva10,
+        iva5: r.iva5,
+        total: r.total,
+        moneda: r.moneda,
+        categoryId: suggestedCategory,
+      },
+    });
+    created++;
+  }
+
+  await audit("create", "expense_import", undefined, { created, skipped });
+  revalidatePath("/expenses");
+  return { created, skipped };
 }
