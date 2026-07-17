@@ -11,6 +11,7 @@ import {
   Package,
   Receipt,
   BookOpen,
+  Landmark,
   BarChart3,
   Settings,
   LogOut,
@@ -37,6 +38,7 @@ const NAV = [
   { href: "/products", key: "nav.products", icon: Package },
   { href: "/expenses", key: "nav.expenses", icon: Receipt },
   { href: "/books", key: "nav.books", icon: BookOpen },
+  { href: "/taxes", key: "nav.taxes", icon: Landmark },
   { href: "/reports", key: "nav.reports", icon: BarChart3 },
   { href: "/settings", key: "nav.settings", icon: Settings },
 ] as const;

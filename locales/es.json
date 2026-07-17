@@ -53,7 +53,8 @@
     "books": "Libros IVA",
     "reports": "Reportes",
     "settings": "Configuración",
-    "logout": "Cerrar sesión"
+    "logout": "Cerrar sesión",
+    "taxes": "Impuestos"
   },
   "env": {
     "mock": "SIMULACIÓN",
@@ -290,7 +291,25 @@
     "sourceMANUAL": "Manual",
     "viewFile": "Ver comprobante",
     "noApiKey": "ANTHROPIC_API_KEY no está configurada — la extracción automática está deshabilitada. Podés cargar el gasto manualmente.",
-    "deleteConfirm": "¿Eliminar este gasto?"
+    "deleteConfirm": "¿Eliminar este gasto?",
+    "items": "Ítems del comprobante",
+    "addItem": "Agregar ítem",
+    "noItemsHint": "Sin ítems cargados: se aplica un % de deducibilidad único a todo el gasto.",
+    "deduciblePercent": "% deducible",
+    "itemDescription": "Descripción",
+    "itemTasa": "Tasa",
+    "deducibleShort": "% deducible",
+    "ivaDeducible": "IVA deducible",
+    "ivaNoDeducible": "IVA no deducible",
+    "ivaDeducibleTotal": "Total IVA deducible",
+    "itemsMismatch": "La suma de los ítems no coincide con el total del comprobante",
+    "exenta": "Exenta",
+    "importMarangatu": "Importar de Marangatu",
+    "importTitle": "Importar comprobantes de Marangatu",
+    "importHint": "Subí el CSV/XLSX de comprobantes electrónicos y virtuales exportado desde Marangatu (ítem 'Consulta de comprobantes'). Se detectan duplicados automáticamente por RUC + número + fecha + total.",
+    "importFile": "Archivo CSV o XLSX",
+    "importSubmit": "Importar",
+    "importResult": "{created} gastos creados, {skipped} duplicados omitidos, {errors} filas con error"
   },
   "books": {
     "title": "Libros IVA",
@@ -313,7 +332,8 @@
     "total": "Total",
     "totals": "Totales del mes",
     "onlyApproved": "Solo se incluyen documentos aprobados y gastos confirmados",
-    "emptyMonth": "No hay movimientos en este mes"
+    "emptyMonth": "No hay movimientos en este mes",
+    "ivaDeducible": "IVA deducible"
   },
   "reports": {
     "title": "Reportes",
@@ -404,5 +424,24 @@
     "fieldIva5": "IVA 5%",
     "fieldTotal": "Total",
     "fieldMoneda": "Moneda"
+  },
+  "taxes": {
+    "title": "Impuestos",
+    "form120": "Formulario 120 (IVA mensual)",
+    "form120Hint": "Borrador de trabajo — no es el formulario oficial. Cargá estos importes en Marangatu.",
+    "debitoFiscal": "Débito fiscal",
+    "creditoFiscal": "Crédito fiscal",
+    "saldoAnterior": "Saldo a favor del período anterior",
+    "saldoAnteriorHint": "Cargá manualmente el saldo a favor que arrastrás del Formulario 120 anterior.",
+    "resultado": "Resultado del período",
+    "aPagar": "IVA a pagar",
+    "saldoAFavor": "Saldo a favor siguiente período",
+    "downloadForm120": "Descargar borrador Formulario 120 (PDF)",
+    "downloadReport": "Descargar informe mensual (PDF)",
+    "ventasSection": "Ventas (débito fiscal)",
+    "comprasSection": "Compras (crédito fiscal deducible)",
+    "ivaNoDeducible": "IVA no deducible (al costo)",
+    "documentCounts": "{ventas} ventas · {compras} compras",
+    "saved": "Guardado"
   }
 }

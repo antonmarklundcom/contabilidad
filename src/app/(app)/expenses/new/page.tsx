@@ -25,6 +25,8 @@ export default async function NewExpensePage() {
           iva5: 0,
           total: 0,
           moneda: "PYG",
+          deduciblePercent: 100,
+          items: [],
           categoryId: "",
           notes: "",
         }}

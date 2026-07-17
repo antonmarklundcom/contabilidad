@@ -309,6 +309,7 @@ enum ExpenseSource {
   PHOTO
   PDF
   MANUAL
+  IMPORT
 }
 
 enum ExpenseStatus {
@@ -350,6 +351,9 @@ model Expense {
   total              Decimal @default(0) @db.Decimal(18, 2)
   moneda             String  @default("PYG")
   exchangeRate       Decimal? @db.Decimal(18, 4)
+  // IVA-credit deductibility: applies when the expense has no items;
+  // with items, each item's deduciblePercent wins (see lib/deductibility.ts).
+  deduciblePercent   Int     @default(100)
   categoryId         String?
   filePath           String?
   fileMime           String?
@@ -363,10 +367,31 @@ model Expense {
 
   company  Company          @relation(fields: [companyId], references: [id])
   category ExpenseCategory? @relation(fields: [categoryId], references: [id])
+  items    ExpenseItem[]
 
   @@index([companyId, fecha])
   @@index([companyId, status])
   @@index([companyId, supplierRuc, numeroComprobante])
+}
+
+// Line items of a received comprobante — the unit of IVA deductibility.
+// `total` is IVA-included (SIFEN convention); the item's IVA is derived
+// from `tasa` and the deducible part from `deduciblePercent`.
+model ExpenseItem {
+  id               String  @id @default(cuid())
+  expenseId        String
+  orden            Int     @default(0)
+  descripcion      String
+  cantidad         Decimal? @db.Decimal(18, 4)
+  total            Decimal @default(0) @db.Decimal(18, 2)
+  tasa             Int     @default(10) // 10 | 5 | 0 (0 = exenta)
+  deduciblePercent Int     @default(100) // 0..100 — IVA credit % for this item
+  deducibleReason  String? // why the AI (or the user) set this percentage
+  aiSuggested      Boolean @default(false)
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
 }
 
 // Remembers supplier → category so the next OCR pre-selects it.

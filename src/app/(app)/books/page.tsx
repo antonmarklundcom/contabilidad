@@ -75,7 +75,7 @@ export default async function BooksPage({
                 </a>
               </Button>
             </div>
-            <LibroTable rows={compras.rows} totals={compras.totals} />
+            <LibroTable rows={compras.rows} totals={compras.totals} showDeducible />
           </TabsContent>
         </Tabs>
       </Suspense>

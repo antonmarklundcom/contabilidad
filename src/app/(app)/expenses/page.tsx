@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Receipt } from "lucide-react";
+import { Receipt, FileSpreadsheet } from "lucide-react";
 
 const PAGE_SIZE = 25;
 
@@ -82,6 +82,11 @@ export default async function ExpensesPage({
           <div className="flex gap-2">
             <Button variant="outline" asChild>
               <Link href="/expenses/new">{t("expenses.manual")}</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/expenses/import">
+                <FileSpreadsheet /> {t("expenses.importMarangatu")}
+              </Link>
             </Button>
             <Button asChild>
               <Link href="/expenses/upload">{t("expenses.upload")}</Link>

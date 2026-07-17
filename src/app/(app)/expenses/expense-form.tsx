@@ -16,10 +16,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { saveExpense } from "./actions";
-import type { ExpenseInput } from "@/lib/validators";
+import type { ExpenseInput, ExpenseItemInput } from "@/lib/validators";
 import { calcularDigitoVerificador } from "@/lib/sifen/ruc";
+import { computeDeducible, itemIva, itemsMatchTotal } from "@/lib/deductibility";
 import { cn } from "@/lib/utils";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Plus, Sparkles, Trash2 } from "lucide-react";
 
 export interface CategoryOption {
   id: string;
@@ -56,6 +57,29 @@ export function ExpenseForm({
 
   const set = <K extends keyof ExpenseFormValues>(key: K, value: ExpenseFormValues[K]) =>
     setValues((v) => ({ ...v, [key]: value }));
+
+  const setItem = (index: number, patch: Partial<ExpenseItemInput>) =>
+    setValues((v) => ({
+      ...v,
+      items: v.items.map((item, i) => (i === index ? { ...item, ...patch } : item)),
+    }));
+
+  const deducibleTotals = computeDeducible({
+    iva10: Number(values.iva10 || 0),
+    iva5: Number(values.iva5 || 0),
+    deduciblePercent: values.deduciblePercent,
+    moneda: values.moneda,
+    items: values.items.map((it) => ({
+      total: Number(it.total) || 0,
+      tasa: it.tasa,
+      deduciblePercent: it.deduciblePercent,
+    })),
+  });
+  const itemsOk = itemsMatchTotal(
+    values.items.map((it) => ({ total: Number(it.total) || 0, tasa: it.tasa, deduciblePercent: it.deduciblePercent })),
+    Number(values.total) || 0,
+    values.moneda
+  );
 
   const lowConf = (field: string) =>
     confidences && confidences[field] !== undefined && confidences[field] < LOW_CONFIDENCE;
@@ -264,6 +288,170 @@ export function ExpenseForm({
           {numberField("iva10", "books.iva10")}
           {numberField("iva5", "books.iva5")}
           {numberField("total", "common.total")}
+        </div>
+
+        {/* ── Items & IVA deductibility ─────────────────────────────── */}
+        <div className="space-y-2 rounded-lg border bg-card p-3">
+          <div className="flex items-center justify-between">
+            <Label>{t("expenses.items")}</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                set("items", [
+                  ...values.items,
+                  { descripcion: "", total: 0, tasa: 10, deduciblePercent: 100, deducibleReason: "", aiSuggested: false },
+                ])
+              }
+            >
+              <Plus /> {t("expenses.addItem")}
+            </Button>
+          </div>
+
+          {values.items.length === 0 ? (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">{t("expenses.noItemsHint")}</p>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="deduciblePercent" className="text-xs">
+                  {t("expenses.deduciblePercent")}
+                </Label>
+                <Input
+                  id="deduciblePercent"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={values.deduciblePercent}
+                  onChange={(e) => set("deduciblePercent", Number(e.target.value))}
+                  className="w-20 text-right tabular-nums"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {!itemsOk && (
+                <Alert variant="warning">
+                  <AlertTriangle />
+                  <AlertDescription>{t("expenses.itemsMismatch")}</AlertDescription>
+                </Alert>
+              )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-muted-foreground">
+                      <th className="py-1.5 pr-2 font-medium">{t("expenses.itemDescription")}</th>
+                      <th className="py-1.5 pr-2 text-right font-medium">{t("common.total")}</th>
+                      <th className="py-1.5 pr-2 font-medium">{t("expenses.itemTasa")}</th>
+                      <th className="py-1.5 pr-2 text-right font-medium">{t("expenses.deducibleShort")}</th>
+                      <th className="py-1.5 pr-2 text-right font-medium">{t("expenses.ivaDeducible")}</th>
+                      <th className="py-1.5" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {values.items.map((item, i) => {
+                      const iva = itemIva(Number(item.total) || 0, item.tasa, values.moneda);
+                      const deducible =
+                        Math.round(iva * (item.deduciblePercent / 100) * 100) / 100;
+                      return (
+                        <tr key={i} className="border-b align-top last:border-0">
+                          <td className="py-1.5 pr-2">
+                            <Input
+                              value={item.descripcion}
+                              onChange={(e) => setItem(i, { descripcion: e.target.value })}
+                              className="h-8"
+                            />
+                            {item.deducibleReason && (
+                              <p className="mt-1 flex items-start gap-1 text-xs text-muted-foreground">
+                                {item.aiSuggested && <Sparkles className="mt-0.5 h-3 w-3 shrink-0" />}
+                                {item.deducibleReason}
+                              </p>
+                            )}
+                          </td>
+                          <td className="py-1.5 pr-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              step={values.moneda === "PYG" ? 1 : 0.01}
+                              value={item.total || ""}
+                              onChange={(e) => setItem(i, { total: Number(e.target.value) })}
+                              className="h-8 w-28 text-right tabular-nums"
+                            />
+                          </td>
+                          <td className="py-1.5 pr-2">
+                            <Select
+                              value={String(item.tasa)}
+                              onValueChange={(v) => setItem(i, { tasa: Number(v) })}
+                            >
+                              <SelectTrigger className="h-8 w-20">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="10">10%</SelectItem>
+                                <SelectItem value="5">5%</SelectItem>
+                                <SelectItem value="0">{t("expenses.exenta")}</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="py-1.5 pr-2">
+                            <div className="flex items-center justify-end gap-1">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={1}
+                                value={item.deduciblePercent}
+                                onChange={(e) =>
+                                  setItem(i, {
+                                    deduciblePercent: Number(e.target.value),
+                                    aiSuggested: false,
+                                  })
+                                }
+                                className={cn(
+                                  "h-8 w-16 text-right tabular-nums",
+                                  item.aiSuggested && item.deduciblePercent < 100 && "border-amber-400 bg-amber-50"
+                                )}
+                              />
+                              <span className="text-xs text-muted-foreground">%</span>
+                            </div>
+                          </td>
+                          <td className="py-1.5 pr-2 text-right tabular-nums text-muted-foreground">
+                            {money(deducible, values.moneda)}
+                          </td>
+                          <td className="py-1.5 text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground"
+                              aria-label={t("common.delete")}
+                              onClick={() =>
+                                set("items", values.items.filter((_, j) => j !== i))
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          <div className="flex flex-wrap justify-end gap-x-6 gap-y-1 border-t pt-2 text-sm">
+            <span className="text-muted-foreground">
+              {t("expenses.ivaNoDeducible")}:{" "}
+              <span className="tabular-nums">{money(deducibleTotals.ivaNoDeducible, values.moneda)}</span>
+            </span>
+            <span className="font-medium">
+              {t("expenses.ivaDeducibleTotal")}:{" "}
+              <span className="tabular-nums">{money(deducibleTotals.ivaDeducible, values.moneda)}</span>
+            </span>
+          </div>
         </div>
 
         <div className="space-y-1.5">

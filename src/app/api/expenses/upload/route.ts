@@ -44,7 +44,13 @@ export async function POST(req: Request) {
 
   if (anthropicConfigured()) {
     try {
-      const result = await extractReceipt(buffer, file.type);
+      const company = await prisma.company.findUnique({ where: { id: companyId } });
+      const actividades = Array.isArray(company?.actividades)
+        ? (company.actividades as { descripcion?: string }[])
+            .map((a) => a?.descripcion)
+            .filter((s): s is string => Boolean(s))
+        : [];
+      const result = await extractReceipt(buffer, file.type, { actividades });
       extraction = result.extraction;
       warnings = result.warnings;
     } catch (err) {
@@ -84,6 +90,20 @@ export async function POST(req: Request) {
       fileMime: file.type,
       ocrRawJson: (extraction as Prisma.InputJsonValue) ?? undefined,
       confidence: (e?.confidences as Prisma.InputJsonValue) ?? undefined,
+      items: e?.items?.length
+        ? {
+            create: e.items.map((item, i) => ({
+              orden: i,
+              descripcion: item.descripcion,
+              cantidad: item.cantidad ?? null,
+              total: item.total ?? 0,
+              tasa: [10, 5, 0].includes(item.tasa) ? item.tasa : 10,
+              deduciblePercent: Math.min(100, Math.max(0, Math.round(item.deducibilidadSugerida ?? 100))),
+              deducibleReason: item.motivoDeducibilidad ?? null,
+              aiSuggested: true,
+            })),
+          }
+        : undefined,
     },
   });
 
