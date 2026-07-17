@@ -442,6 +442,19 @@
     "comprasSection": "Purchases (deductible tax credit)",
     "ivaNoDeducible": "Non-deductible VAT (to cost)",
     "documentCounts": "{ventas} sales · {compras} purchases",
-    "saved": "Saved"
+    "saved": "Saved",
+    "reconciliation": "Period reconciliation",
+    "reconciliationClean": "No pending documents. The period is ready to close.",
+    "reconciliationDirty": "There are unresolved documents — review them before closing the period.",
+    "unresolvedInvoices": "Invoices not yet approved by SIFEN",
+    "unresolvedExpenses": "Unconfirmed or duplicate expenses",
+    "reason": {
+      "NEEDS_REVIEW": "Needs review",
+      "DUPLICATE_SUSPECT": "Possible duplicate"
+    },
+    "closePeriod": "Close period",
+    "closeBlockedHint": "Resolve the pending documents before closing the period.",
+    "closedBy": "Period closed by {user} on {date}",
+    "reopen": "Reopen"
   }
 }

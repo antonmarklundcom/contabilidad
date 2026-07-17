@@ -442,6 +442,19 @@
     "comprasSection": "Compras (crédito fiscal deducible)",
     "ivaNoDeducible": "IVA no deducible (al costo)",
     "documentCounts": "{ventas} ventas · {compras} compras",
-    "saved": "Guardado"
+    "saved": "Guardado",
+    "reconciliation": "Conciliación del período",
+    "reconciliationClean": "No hay documentos pendientes. El período está listo para cerrar.",
+    "reconciliationDirty": "Hay documentos sin resolver — revisalos antes de cerrar el período.",
+    "unresolvedInvoices": "Facturas sin aprobar por SIFEN",
+    "unresolvedExpenses": "Gastos sin confirmar o duplicados",
+    "reason": {
+      "NEEDS_REVIEW": "Para revisar",
+      "DUPLICATE_SUSPECT": "Posible duplicado"
+    },
+    "closePeriod": "Cerrar período",
+    "closeBlockedHint": "Resolvé los documentos pendientes antes de cerrar el período.",
+    "closedBy": "Período cerrado por {user} el {date}",
+    "reopen": "Reabrir"
   }
 }
