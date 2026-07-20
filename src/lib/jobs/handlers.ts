@@ -1,5 +1,6 @@
 import { sendInvoiceToSifen, queryInvoiceStatus, cancelInvoice, regenerateKude } from "@/lib/dte";
 import { createBackup } from "@/lib/backup";
+import { sendCloseReport, sendDeclarationReminder } from "@/lib/tax-close";
 
 export async function runJobHandler(
   type: string,
@@ -20,6 +21,16 @@ export async function runJobHandler(
       return;
     case "backup":
       await createBackup();
+      return;
+    case "send_report":
+      await sendCloseReport(String(payload.companyId), Number(payload.year), Number(payload.month));
+      return;
+    case "declaration_reminder":
+      await sendDeclarationReminder(
+        String(payload.companyId),
+        Number(payload.year),
+        Number(payload.month)
+      );
       return;
     default:
       throw new Error(`Unknown job type: ${type}`);

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { getCompanyId } from "@/lib/company";
 import { getT } from "@/lib/i18n-server";
+import { prisma } from "@/lib/prisma";
 import { buildForm120, getPeriodClose } from "@/lib/form120";
 import { buildReconciliation } from "@/lib/reconcile";
+import { f120DueDate, rucLastDigit } from "@/lib/tax-calendar";
 import { PageHeader } from "@/components/page-header";
 import { MonthPicker } from "@/components/month-picker";
 import { Button } from "@/components/ui/button";
@@ -29,11 +31,14 @@ export default async function TaxesPage({
   const year = Number(params.year) || now.getFullYear();
   const month = Number(params.month) || now.getMonth() + 1;
 
-  const [data, reconciliation, close] = await Promise.all([
+  const [data, reconciliation, close, company] = await Promise.all([
     buildForm120(companyId, year, month),
     buildReconciliation(companyId, year, month),
     getPeriodClose(companyId, year, month),
+    prisma.company.findUniqueOrThrow({ where: { id: companyId } }),
   ]);
+  const dueDate = f120DueDate(company.ruc, year, month);
+  const dueLabel = dueDate.toLocaleDateString("es-PY", { timeZone: "UTC" });
 
   const Row = ({ label, value, bold }: { label: string; value: number; bold?: boolean }) => (
     <div className={`flex justify-between py-1 text-sm ${bold ? "font-semibold" : ""}`}>
@@ -48,7 +53,10 @@ export default async function TaxesPage({
 
       <Alert variant="info">
         <Info />
-        <AlertDescription>{t("taxes.form120Hint")}</AlertDescription>
+        <AlertDescription>
+          {t("taxes.form120Hint")}{" "}
+          {t("taxes.dueDate", { date: dueLabel, digit: rucLastDigit(company.ruc) })}
+        </AlertDescription>
       </Alert>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -121,6 +129,9 @@ export default async function TaxesPage({
               </a>
             </Button>
           </div>
+          {close?.files && (
+            <p className="text-xs text-muted-foreground">{t("taxes.frozenFiles")}</p>
+          )}
         </CardContent>
       </Card>
 

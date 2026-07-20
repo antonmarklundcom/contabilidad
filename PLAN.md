@@ -8,56 +8,58 @@ A competitor is publicly demoing an AI accountant for Paraguay that: classifies 
 
 We already have the foundation they'd need: real SIFEN emission (mock + real adapters), OCR expense capture with **local** validation, libro de ventas/compras, IVA débito/crédito position, KuDE PDFs, a job queue, and audit logging. The plan below closes the visible feature gap and beats them on trustworthiness.
 
-## Phase 1 — Monthly IVA close & Formulario 120 draft (highest value, lowest risk)
+## Status at a glance
 
-The centerpiece of the competitor's demo is really a *report*: period sales/purchases classified into F.120 casillas, plus a discrepancy list. We can produce that from data we already trust.
+| Phase | State |
+|---|---|
+| 1 — F.120 draft + reconciliation + close | ✅ built |
+| 2 — Deducibility (AI-suggested, human-decided) | ✅ built |
+| 3 — External comprobante import | ✅ built (CDC lookup pending) |
+| 4 — Close integrity & delivery | ⏳ current focus |
+| 5 — Payments & cuentas por cobrar | ⬜ next |
 
-1. **`src/lib/tax/f120.ts`** — pure functions that map a period's approved invoices (`libroVentas`) and confirmed expenses (`libroCompras`) into F.120 rubros/casillas: gravadas 10%, gravadas 5%, exentas, IVA débito, IVA crédito, saldo a favor / a pagar. Deterministic math only — same philosophy as `money.ts`. Unit tests against hand-computed fixtures.
-2. **Reconciliation checks** (`src/lib/tax/reconcile.ts`): the competitor's most impressive screenshot is the "registered in app but NOT emitted in Marangatú" table. We can do this natively because we *are* the emitter:
-   - invoices in the app not yet APPROVED by SIFEN (draft/queued/contingency/rejected) for the period;
-   - sequence gaps in `DocumentSequence` ranges;
-   - expenses with failed local validation (RUC check digit, totals math) still unresolved;
-   - duplicate-suspect expenses.
-3. **`/reports/declaracion` route** — period picker, casilla summary, discrepancy tables, per-number drill-down. Server Component + existing list-controls conventions.
-4. **Monthly close PDF** (`src/lib/tax/report-pdf.ts`, reusing the `kude.ts` pdfkit setup): the full report — casillas, libro summaries, discrepancies, "reviewed by" line. Stored under `STORAGE_DIR/exports`, never deleted (tax doc policy).
-5. **Explicit human sign-off**: a "Cerrar período" action records who approved the close (`audit()`), locks the period's numbers into a snapshot table. The PDF footer states the figures were human-approved — the direct counter to "no se equivoca NUNCA."
+## Phase 1 — Monthly IVA close & Formulario 120 draft ✅ DONE
 
-**Not in scope:** auto-submitting the F.120 to Marangatú. There is no public filing API; automating it means storing the client's SET login and screen-scraping a government portal. We produce a *transcription-ready* draft (casilla → value table matching the form layout) instead. See STRATEGY.md §Risk.
+Shipped as `src/lib/form120.ts` (pure `computeForm120` + DB `buildForm120`), `src/lib/reconcile.ts` (unresolved invoices/expenses/duplicates), the `/taxes` route (period picker, débito/crédito cards, liquidación, discrepancy tables), `src/lib/tax-report.ts` (F.120 working-draft PDF + informe mensual PDF, both labeled "borrador de trabajo"), and `closePeriod`/`reopenPeriod` with human sign-off recorded via `audit()`. Saldo anterior is editable per period (`SaldoAnteriorForm`).
 
-## Phase 2 — Deducibility engine (AI-suggested, human-decided)
+**Deliberately out of scope, permanently:** auto-submitting the F.120 to Marangatú. There is no public filing API; automating it means storing the client's SET login and screen-scraping a government portal. We produce a *transcription-ready* draft instead. See STRATEGY.md §Risk. (SIFEN emission is different — it has an official web-services API and we already use it through the adapter.)
 
-Item-by-item deducibility is genuinely useful and a real pain point. Competitor claims AI decides; we make AI *suggest* and a human confirm — same pattern as our OCR review screen.
+## Phase 2 — Deducibility engine ✅ DONE
 
-1. Schema: add `deductibility` (`FULL | PARTIAL | NONE | PENDING`), `deductibilityConfidence`, `deductibilityReason` to `Expense` (and later per-line if we itemize expenses).
-2. **Rules first, AI second** (`src/lib/tax/deductibility.ts`):
-   - deterministic rules for the clear cases (category-based: fuel limits, personal-consumption categories, missing/invalid RUC ⇒ not deductible, etc.), maintained as data not prompts;
-   - Anthropic call (same stack as `ocr.ts`: `messages.parse()` + zod + per-field confidence) only for the ambiguous remainder;
-   - everything below a confidence threshold renders amber and stays `PENDING` until a human decides. Decisions feed `SupplierCategoryMap`-style memory so repeat suppliers stop needing review.
-3. Review UI on the expense detail + a "pending deducibility" queue filter on the expenses list.
-4. Deducibility feeds Phase 1's IVA crédito figures — only confirmed-deductible IVA counts.
+Item-level `deduciblePercent` on `ExpenseItem` (expense-level fallback), pure math in `src/lib/deductibility.ts` (tested, header-IVA-capped), OCR suggests `deducibilidadSugerida` per item with reason (Ley 6380/19 prompt context) — **the human decides**; deducible IVA feeds the F.120 crédito fiscal. Supplier→category memory reduces repeat review.
 
-## Phase 3 — External comprobante import & reconciliation
+## Phase 3 — External comprobante import ✅ MOSTLY DONE
 
-The competitor ingests "electrónicas y virtuales que están en Marangatú." We do the same without credentials:
+`src/lib/marangatu-import.ts` parses Marangatú "Consulta de comprobantes" exports (flexible header matching, RUC DV validation) → bulk-creates expenses via `/expenses/import`; duplicate matching on (RUC, número, fecha, total) merges photographed and electronic twins.
 
-1. **XML DE upload**: accept e-Kuatia XML files the user downloads themselves (Marangatú lets taxpayers export their received DEs). Parse with the same field vocabulary as `sifen/mapping.ts`; validate CDC with our local `cdc.ts`; create/match expenses. Batch upload.
-2. **CDC lookup**: a "paste CDC" flow that runs `queryStatus`/consulta through the existing SIFEN adapter to verify a received document is real and APPROVED before trusting it — a check the competitor doesn't show.
-3. Reconcile imported DEs against OCR-captured expenses (match on RUC + número + fecha + total, the existing duplicate-detection key) so a photographed invoice and its electronic twin merge instead of double-counting.
+**Remaining:** the "paste CDC" verification flow — run `queryStatus` through the SIFEN adapter to confirm a received document is real and APPROVED before trusting it. Small; do alongside Phase 4 or 5.
 
-## Phase 4 — Delivery & polish
+## Phase 4 — Close integrity & delivery ⏳ CURRENT
 
-1. **Email delivery** of the monthly close PDF via existing `mailer.ts`, enqueued as a `send_report` job after period close.
-2. **WhatsApp**: keep the current honest share flow (open WhatsApp with message, user attaches PDF). True auto-send requires the WhatsApp Business API — evaluate cost/approval then; do not fake it.
-3. **Scheduled close reminder**: cron job that, a few days before the F.120 due date (per SET's perpetual calendar by RUC last digit), emails/notifies "your draft declaration is ready to review."
-4. Multi-tenant activation (the `companyId` groundwork already exists) once a second client wants in.
+The close exists but isn't yet airtight or delivered. Four gaps, in build order:
+
+1. **Saldo a favor carry-forward.** Closing a period with `saldoAFavor > 0` must seed the next period's `saldoAnterior` automatically (still user-overridable). Today the user retypes it — the one place a transcription error can silently corrupt next month's liquidación.
+2. **Frozen close artifacts.** `closePeriodAction` stores a JSON snapshot, but the PDF export routes regenerate from *live* data — figures can drift after close (late expense edits, reopened documents). At close time, generate the F.120 draft PDF and informe mensual PDF and store them under `STORAGE_DIR/exports` (tax-doc policy: never deleted); record the filenames in the close record; the `/taxes` page links the frozen files when the period is closed.
+3. **Vencimiento awareness.** `src/lib/tax-calendar.ts`: the DNIT perpetual calendar (RUC last digit → due day) as pure, tested functions. Show "vence el dd/mm" on `/taxes`; weekend fallthrough to the next business day (holidays documented as a limitation).
+4. **Delivery.** A `send_report` job (existing mailer, existing queue) that emails the frozen close PDFs to the company email after close, when SMTP is configured. Cron (`/api/cron`) additionally enqueues a reminder email a few days before the due date if the previous period isn't closed yet — "your draft declaration is waiting." WhatsApp stays the honest share flow (open with message; true auto-send only via the paid WhatsApp Business API, evaluated when a client pays for it).
+
+## Phase 5 — Payments & cuentas por cobrar ⬜ NEXT
+
+Emission and the monthly close are the compliance loop; getting paid is the daily loop. Nothing tracks payments today (no `Payment` model).
+
+1. **Schema:** `Payment` (companyId, invoiceId, date, amount, currency, method enum: `EFECTIVO | TRANSFERENCIA | TARJETA | CHEQUE | BILLETERA | QR`, reference, note) + on `Invoice`: `paymentCondition` (`CONTADO | CREDITO`), `dueDate`, derived `paidTotal`/`paymentStatus` (`PENDIENTE | PARCIAL | PAGADA | VENCIDA`). Partial payments are normal; PYG integer amounts throughout.
+2. **Register payment** flow on the invoice detail (server action, zod, `audit()`); payment history list per invoice and per client.
+3. **Cuentas por cobrar view:** aging report (al día / 1–30 / 31–60 / 60+ días) as the "who owes me" screen, with the existing list-controls conventions (search, filters, CSV export).
+4. **Cobro via WhatsApp:** one-tap `wa.me` reminder link per overdue invoice (prefilled message with number, amount, due date). Manual first — same honesty rule as report delivery.
+5. **Accounting tie-in:** dashboard gains cobrado vs. facturado for the period; the informe mensual gets a cartera section (facturado, cobrado, vencido). IVA stays accrual-based (por lo devengado) — payments do NOT change the F.120 math.
+6. **Later (demand-driven):** nota de crédito flow tied to the original invoice; presupuestos/cotizaciones convertible to invoices; bank-statement reconciliation.
 
 ## Sequencing & effort
 
 | Phase | Depends on | Rough size |
 |---|---|---|
-| 1 — F.120 draft + close report | nothing new | core math + 1 route + 1 PDF |
-| 2 — Deducibility | Phase 1 UI shell | schema migration + rules + review UI |
-| 3 — DE import | mapping vocabulary (exists) | parser + matcher + upload route |
-| 4 — Delivery | Phases 1–3 | small, mostly wiring |
+| 4 — Close integrity & delivery | nothing new | carry-forward + PDF freeze + calendar + 1 job |
+| 3-remainder — CDC lookup | SIFEN adapter (exists) | 1 small flow |
+| 5 — Payments & CxC | nothing new | 1 model + 1 flow + 1 view + wa.me links |
 
-Tests to keep green throughout: existing money/RUC/CDC/sequence suites, plus new fixtures for f120 math and deductibility rules — these are money-path and get the same "protect the money" treatment as `tests/`.
+Tests to keep green throughout: existing money/RUC/CDC/sequence/f120/deductibility suites, plus new fixtures for the tax calendar and carry-forward — money-path code gets the same "protect the money" treatment as `tests/`.

@@ -455,6 +455,8 @@
     "closePeriod": "Cerrar período",
     "closeBlockedHint": "Resolvé los documentos pendientes antes de cerrar el período.",
     "closedBy": "Período cerrado por {user} el {date}",
-    "reopen": "Reabrir"
+    "reopen": "Reabrir",
+    "dueDate": "Según el calendario perpetuo (RUC terminado en {digit}), vence el {date}.",
+    "frozenFiles": "Período cerrado: los PDF descargables son los archivos congelados al momento del cierre."
   }
 }

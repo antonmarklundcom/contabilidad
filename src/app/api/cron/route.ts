@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runPendingJobs } from "@/lib/jobs/runner";
 import { enqueueNightlyBackupIfDue } from "@/lib/backup";
+import { enqueueDeclarationReminderIfDue } from "@/lib/tax-close";
 
 /**
  * External cron entry point. Protect with the x-cron-secret header:
@@ -13,6 +14,7 @@ async function handle(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   await enqueueNightlyBackupIfDue();
+  await enqueueDeclarationReminderIfDue();
   const { processed } = await runPendingJobs();
   return NextResponse.json({ ok: true, processed });
 }

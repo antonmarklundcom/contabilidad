@@ -455,6 +455,8 @@
     "closePeriod": "Close period",
     "closeBlockedHint": "Resolve the pending documents before closing the period.",
     "closedBy": "Period closed by {user} on {date}",
-    "reopen": "Reopen"
+    "reopen": "Reopen",
+    "dueDate": "Per the perpetual due-date calendar (RUC ending in {digit}), it is due on {date}.",
+    "frozenFiles": "Period closed: the downloadable PDFs are the files frozen at close time."
   }
 }

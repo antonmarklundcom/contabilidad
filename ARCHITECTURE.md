@@ -46,55 +46,55 @@ Load-bearing invariants (do not weaken while extending):
 5. **Every company-scoped query filters by `companyId`** via `getCompanyId()` — the multi-tenant seam.
 6. **Tax artifacts are write-once** on disk; mutations audit().
 
-## Extension 1 — Tax module (`src/lib/tax/`) — PLAN Phase 1–2
+## Extension 1 — Tax module — PLAN Phase 1–2 (BUILT)
 
-New sibling to `sifen/`, same "pure core, thin edges" shape:
+Implemented as flat siblings in `src/lib/` (same "pure core, thin edges" shape as planned, without the `tax/` subfolder):
 
 ```
-src/lib/tax/
-├── f120.ts           period → casilla map. Pure functions over the same
-│                     query results accounting.ts already produces.
-│                     No I/O, no AI. Fixture-tested.
+src/lib/
+├── form120.ts        pure computeForm120 + DB buildForm120; saldo anterior,
+│                     PeriodClose record, carry-forward. Fixture-tested.
 ├── reconcile.ts      discrepancy checks: unapproved invoices in period,
-│                     sequence gaps, failed-validation expenses, duplicate
-│                     suspects. Pure functions returning typed findings.
-├── deductibility.ts  rules table (deterministic, data-driven) +
-│                     AI fallback for ambiguous cases (ocr.ts pattern:
-│                     messages.parse + zod + confidence). Suggests only.
-└── report-pdf.ts     monthly close PDF via pdfkit (reuse kude.ts helpers;
-                      extract shared bits into pdf-common.ts if needed).
+│                     needs-review expenses, duplicate suspects.
+├── deductibility.ts  pure per-item deducible math (header-IVA-capped);
+│                     the AI SUGGESTION lives in ocr.ts (deducibilidadSugerida
+│                     per item, with reason) — the human decides.
+├── tax-report.ts     F.120 working-draft PDF + informe mensual (pdfkit).
+├── tax-calendar.ts   DNIT perpetual due-date calendar (RUC last digit →
+│                     due day, weekend shift). Pure, tested.
+└── tax-close.ts      close artifacts (frozen PDFs under exports/), report
+                      email, declaration reminder (cron-driven).
 ```
 
-Schema additions:
+Schema notes (as built):
 
-- `PeriodClose` model: `companyId`, `period` (YYYY-MM), casilla snapshot (JSON), `approvedByUserId`, `approvedAt`, `reportPath`. Unique on (`companyId`, `period`). Closing writes the snapshot so later data edits can't silently rewrite a declared month; re-opening is an explicit audited action.
-- `Expense` gains `deductibility` enum + `deductibilityConfidence` + `deductibilityReason` + `deductibilityDecidedByUserId`. Default `PENDING`. `libroCompras`/f120 count IVA crédito only from `FULL`/`PARTIAL` confirmed rows.
+- `PeriodClose` is stored as a JSON value in the existing `Setting` table (`f120.closed.YYYY-MM` per company): `closedBy`, `closedAt`, `snapshot`, `files` (frozen PDF names). Same guarantees as the planned model — closing snapshots the figures AND the PDFs, so later edits can't silently rewrite a declared month; reopening is an explicit audited action. Promote to a real table when multi-tenant reporting needs to query across closes.
+- Deducibility is `deduciblePercent` (0–100) on `ExpenseItem` with expense-level fallback — finer-grained than the planned enum; `libroCompras`/F.120 count only the deducible fraction.
 
-Routes: `/reports/declaracion` (Server Component; period picker via URL params per list-controls convention) with server actions `closePeriod` / `reopenPeriod` in a colocated `actions.ts` (zod-validated, `revalidatePath`, `audit()`).
+Route: `/taxes` (Server Component, period picker via URL params) with server actions in colocated `actions.ts` (`revalidatePath`, `audit()`).
 
-Jobs: `generate_close_report` (PDF build can be slow → queue it, mirror `generate_kude`), later `send_report`.
+Jobs: `send_report` (frozen close PDFs by email), `declaration_reminder`.
 
-## Extension 2 — DE import (PLAN Phase 3)
+## Extension 2 — External comprobante import (PLAN Phase 3, BUILT)
 
-Sits beside OCR as a second intake lane for expenses:
+Sits beside OCR as a second intake lane for expenses. As built, the import consumes Marangatú's **"Consulta de comprobantes" spreadsheet export** (electronic AND virtual comprobantes) rather than raw DE XML — it covers more document types and needs no XML parsing:
 
 ```
-upload XML (user-exported from Marangatú)
-   → parse against sifen/mapping.ts vocabulary  (no new field names!)
-   → cdc.ts local validation of the CDC
-   → optional adapter.queryStatus(cdc) to confirm APPROVED
+upload XLSX/CSV (user-exported from Marangatú)
+   → src/lib/marangatu-import.ts: flexible header matching, RUC DV validation
    → match against existing expenses on (supplierRuc, número, fecha, total)
    → merge or create; conflicts go to the review screen, not auto-resolved
 ```
 
-Route: `/api/expenses/import-xml` (multipart, same shape as `/api/expenses/upload`). Parser lives in `src/lib/sifen/parse-de.ts` because it's SIFEN-vocabulary work — keeping mapping knowledge in one place. **The parser only reads; it never invents fields not in the Manual Técnico README.**
+Route: `/expenses/import` + `/api/expenses/import`. **Remaining:** the "paste CDC" verification flow through `adapter.queryStatus` to confirm a received document is APPROVED.
 
-No Marangatú credentials, ever: import is user-initiated file upload; verification goes through the official consulta service via the existing adapter interface (add a `queryDe(cdc)` method to `SifenAdapter` if the consulta response needs more than `queryStatus` returns — implement in both mock and real adapters).
+No Marangatú credentials, ever: import is user-initiated file upload; verification goes through the official consulta service via the existing adapter interface.
 
-## Extension 3 — Delivery (PLAN Phase 4)
+## Extension 3 — Close integrity & delivery (PLAN Phase 4, BUILT)
 
-- `send_report` job: `mailer.ts` + PDF attachment from storage. Enqueued on period close.
-- Cron: `/api/cron` already runs due jobs; add a due-date check that enqueues a reminder based on SET's perpetual calendar (RUC last digit → due day), stored as data in `tax/calendar.ts`.
+- Closing generates the two PDFs and stores them under `exports/` (never deleted); the export routes serve the frozen file for closed periods, and the close's `saldoAFavor` seeds the next period's saldo anterior automatically (still user-overridable).
+- `send_report` job: `mailer.ts` + frozen PDF attachments, enqueued on close when SMTP + company email exist.
+- Cron: `/api/cron` calls `enqueueDeclarationReminderIfDue()` — perpetual-calendar due date (`tax-calendar.ts`), one reminder per period per company (Setting marker), only if the period isn't closed.
 - WhatsApp stays share-intent (honest manual attach) until/unless WhatsApp Business API is adopted; that would be a new `src/lib/whatsapp.ts` behind its own interface, mockable like the SIFEN adapter.
 
 ## What deliberately does NOT get built
@@ -105,8 +105,9 @@ No Marangatú credentials, ever: import is user-initiated file upload; verificat
 
 ## Testing additions
 
-- `tests/f120.test.ts` — fixture invoices/expenses → expected casillas (incl. 5%/10% mix, exentas, partial deductibility).
-- `tests/deductibility-rules.test.ts` — the deterministic rules table.
+- `tests/form120.test.ts` — fixture totals → expected liquidación (5%/10% mix, exentas, saldo anterior). ✅
+- `tests/deductibility.test.ts` — per-item deducible math, header cap, fallback. ✅
+- `tests/tax-calendar.test.ts` — perpetual-calendar table, weekend shift, year rollover. ✅
 - `tests/parse-de.test.ts` — sample DE XML → parsed DTO → CDC re-validation.
 - Reconciliation findings get golden-file tests (period fixture → expected findings list).
 

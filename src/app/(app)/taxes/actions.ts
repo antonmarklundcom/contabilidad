@@ -4,8 +4,18 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCompanyId } from "@/lib/company";
-import { setSaldoAnterior, buildForm120, closePeriod, reopenPeriod } from "@/lib/form120";
+import {
+  setSaldoAnterior,
+  buildForm120,
+  closePeriod,
+  reopenPeriod,
+  carryForwardSaldo,
+} from "@/lib/form120";
 import { buildReconciliation } from "@/lib/reconcile";
+import { generateCloseArtifacts } from "@/lib/tax-close";
+import { enqueueJob } from "@/lib/jobs/queue";
+import { smtpConfigured } from "@/lib/mailer";
+import { prisma } from "@/lib/prisma";
 import { audit } from "@/lib/audit";
 
 export async function saveSaldoAnterior(
@@ -35,12 +45,20 @@ export async function closePeriodAction(
   const session = await getServerSession(authOptions);
   const closedBy = session?.user?.email ?? session?.user?.name ?? "unknown";
   const snapshot = await buildForm120(companyId, year, month);
-  await closePeriod(companyId, year, month, closedBy, snapshot);
+  const files = await generateCloseArtifacts(companyId, snapshot);
+  await closePeriod(companyId, year, month, closedBy, snapshot, files);
+  // Seed next month's saldo anterior so nobody retypes (and mistypes) it.
+  await carryForwardSaldo(companyId, year, month, snapshot.saldoAFavor);
   await audit("close", "form120", `${year}-${String(month).padStart(2, "0")}`, {
     closedBy,
     aPagar: snapshot.aPagar,
     saldoAFavor: snapshot.saldoAFavor,
+    files,
   });
+  const company = await prisma.company.findUnique({ where: { id: companyId } });
+  if (smtpConfigured() && company?.email) {
+    await enqueueJob("send_report", { companyId, year, month });
+  }
   revalidatePath("/taxes");
   return { ok: true };
 }

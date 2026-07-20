@@ -129,6 +129,8 @@ export interface PeriodClose {
   closedBy: string;
   closedAt: string;
   snapshot: Form120Data;
+  /** Frozen close PDFs stored under exports/ (absent on closes made before this feature). */
+  files?: { form120: string; report: string };
 }
 
 const closeKey = (year: number, month: number) =>
@@ -156,14 +158,35 @@ export async function closePeriod(
   year: number,
   month: number,
   closedBy: string,
-  snapshot: Form120Data
+  snapshot: Form120Data,
+  files?: PeriodClose["files"]
 ): Promise<void> {
-  const value: PeriodClose = { closedBy, closedAt: new Date().toISOString(), snapshot };
+  const value: PeriodClose = { closedBy, closedAt: new Date().toISOString(), snapshot, files };
   await prisma.setting.upsert({
     where: { companyId_key: { companyId, key: closeKey(year, month) } },
     update: { value: JSON.stringify(value) },
     create: { companyId, key: closeKey(year, month), value: JSON.stringify(value) },
   });
+}
+
+/** The period following year-month. */
+export function nextPeriod(year: number, month: number): { year: number; month: number } {
+  return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+}
+
+/**
+ * Seeds the next period's saldo anterior from a closed period's saldo a
+ * favor, so the carry-forward never depends on the user retyping it. The
+ * value stays user-overridable via the saldo form afterwards.
+ */
+export async function carryForwardSaldo(
+  companyId: string,
+  year: number,
+  month: number,
+  saldoAFavor: number
+): Promise<void> {
+  const next = nextPeriod(year, month);
+  await setSaldoAnterior(companyId, next.year, next.month, Math.max(0, Math.round(saldoAFavor)));
 }
 
 export async function reopenPeriod(companyId: string, year: number, month: number): Promise<void> {
