@@ -18,6 +18,18 @@ Read past the marketing and the demo decomposes into five capabilities:
 
 Two things in their demo are actually *ahead* of us today (casilla mapping, DE ingestion) and both are in reach. Everything else is either already ours or a claim we should not imitate.
 
+## The second competitor: the service firm
+
+RucAndAccounting.com sells compliance-as-a-service to foreigners who already hold Paraguayan residency: RUC registration, monthly IVA + yearly IRP filings, proof of address for KYC, tax residency certificate, mail reception, receipts over WhatsApp. Different animal from competitor A — humans do the work, the portal is the shop window.
+
+**They are not competing with us on software.** Their portal shows filings, deadlines and scanned documents; it does not emit DTEs, does not reconcile, does not do item-level deducibility. Where they beat us is *legibility for a non-accountant client*: a countdown to the next deadline, a list of filings with the official PDF attached, and a folder of documents. Those are cheap for us and are now PLAN Phases 5–6.
+
+Where they beat us structurally is **IRP** (PLAN Phase 7) — a residency client's whole reason to hold a RUC is the annual return plus the certificate it enables, and we currently only handle IVA.
+
+Where we should *not* follow: the service lines themselves. Renting addresses, receiving mail, and shipping apostilled certificates is an operations business with headcount, licensing and liability that has nothing to do with a software margin. If we ever want that revenue, the correct move is a referral relationship with a firm like theirs, not building an ops department — and our software is a better portal than theirs on the day we ship Phases 5–6.
+
+Their real lesson is positioning: they sell an *outcome* ("your RUC stays in good standing") to a segment that doesn't want to learn accounting. We sell a system of record. The deadline card and the filing archive are what translate our system of record into their outcome language, for free.
+
 ## Where we win
 
 **1. We emit; they observe.** Their reconciliation compares two views of data they don't control. Our invoices *are* the SIFEN documents — CDC, status, sequence, and rejection codes are first-party. "Registered in app but not emitted" is a query for us, an inference for them. Same for sequence-gap detection: only the emitter can do it.
