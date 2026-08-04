@@ -75,6 +75,62 @@ model Company {
   sifenLogs        SifenLog[]
   auditLogs        AuditLog[]
   settings         Setting[]
+  taxFilings       TaxFiling[]
+}
+
+/// A tax return for one period: the durable record that replaces the
+/// `f120.closed.YYYY-MM` JSON blob previously stashed in `Setting`.
+///
+/// `snapshot` freezes the figures as of close time so later edits to invoices
+/// or expenses cannot silently rewrite a declared period. It is immutable once
+/// written — reopening deletes the filing and closing writes a fresh one.
+model TaxFiling {
+  id        String          @id @default(cuid())
+  companyId String
+  type      TaxFilingType
+  /// Fiscal year the filing covers.
+  year      Int
+  /// Fiscal month for monthly obligations (IVA); null for annual ones (IRP).
+  month     Int?
+  status    TaxFilingStatus @default(DRAFT)
+  /// From the SET perpetual calendar (src/lib/tax/calendar.ts).
+  dueDate   DateTime
+  /// Frozen Form120Data (or the IRP equivalent later). Never mutated.
+  snapshot  Json
+
+  closedBy    String?
+  closedAt    DateTime?
+  submittedAt DateTime?
+  paidAt      DateTime?
+  /// DNIT receipt/acknowledgement PDF, under STORAGE_DIR/filings.
+  officialPdfPath String?
+  notes           String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  // Postgres treats NULLs as distinct, so this constraint does not dedupe
+  // annual (month IS NULL) filings. Harmless today — only IVA is written —
+  // but IRP in Phase 7 must either use a partial unique index or a sentinel
+  // month. Noted rather than solved here: a partial index is not expressible
+  // in the Prisma schema and would show up as drift in CI's migrate diff.
+  @@unique([companyId, type, year, month])
+  @@index([companyId, dueDate])
+  @@index([companyId, status])
+}
+
+enum TaxFilingType {
+  IVA
+  IRP
+}
+
+enum TaxFilingStatus {
+  DRAFT
+  CLOSED
+  SUBMITTED
+  PAID
 }
 
 model Establishment {
