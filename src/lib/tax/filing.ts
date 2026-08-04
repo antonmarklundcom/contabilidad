@@ -116,6 +116,120 @@ export async function closePeriod(
   });
 }
 
+/** Marks a closed filing as presented to DNIT. */
+export async function markSubmitted(
+  companyId: string,
+  filingId: string,
+  submittedAt: Date = new Date()
+): Promise<number> {
+  // Scoped by companyId as well as id — never trust the id alone.
+  const res = await prisma.taxFiling.updateMany({
+    where: { id: filingId, companyId, status: { in: ["CLOSED", "PAID"] } },
+    data: { status: "SUBMITTED", submittedAt },
+  });
+  return res.count;
+}
+
+/** Marks a submitted filing as paid. */
+export async function markPaid(
+  companyId: string,
+  filingId: string,
+  paidAt: Date = new Date()
+): Promise<number> {
+  const res = await prisma.taxFiling.updateMany({
+    where: { id: filingId, companyId, status: { in: ["CLOSED", "SUBMITTED"] } },
+    data: { status: "PAID", paidAt },
+  });
+  return res.count;
+}
+
+/** Attaches the DNIT receipt PDF path to a filing. */
+export async function attachOfficialPdf(
+  companyId: string,
+  filingId: string,
+  officialPdfPath: string
+): Promise<number> {
+  const res = await prisma.taxFiling.updateMany({
+    where: { id: filingId, companyId },
+    data: { officialPdfPath },
+  });
+  return res.count;
+}
+
+/** Free-text note on a filing. */
+export async function setFilingNotes(
+  companyId: string,
+  filingId: string,
+  notes: string
+): Promise<number> {
+  const res = await prisma.taxFiling.updateMany({
+    where: { id: filingId, companyId },
+    data: { notes: notes || null },
+  });
+  return res.count;
+}
+
+export interface FilingListFilters {
+  q?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+/**
+ * Filings for the archive list. Filtered by due date (the date the list is
+ * sorted and range-filtered on) and by a free-text period match, following the
+ * standard list-controls contract.
+ */
+export async function listFilings(companyId: string, filters: FilingListFilters = {}) {
+  const pageSize = filters.pageSize ?? 25;
+  const page = Math.max(1, filters.page ?? 1);
+
+  const where: Prisma.TaxFilingWhereInput = {
+    companyId,
+    ...(filters.status ? { status: filters.status as TaxFilingStatus } : {}),
+    ...(filters.from || filters.to
+      ? {
+          dueDate: {
+            ...(filters.from ? { gte: new Date(filters.from) } : {}),
+            ...(filters.to ? { lte: new Date(`${filters.to}T23:59:59`) } : {}),
+          },
+        }
+      : {}),
+  };
+
+  // Search matches the period label ("2026-05", "2026", "05") and the closer.
+  const q = filters.q?.trim();
+  if (q) {
+    const asNumber = Number(q.replace(/\D/g, ""));
+    const periodMatch = q.match(/^(\d{4})-(\d{1,2})$/);
+    where.OR = [
+      { closedBy: { contains: q, mode: "insensitive" } },
+      { notes: { contains: q, mode: "insensitive" } },
+      ...(periodMatch
+        ? [{ year: Number(periodMatch[1]), month: Number(periodMatch[2]) }]
+        : []),
+      ...(Number.isFinite(asNumber) && asNumber > 1900 && asNumber < 3000
+        ? [{ year: asNumber }]
+        : []),
+    ];
+  }
+
+  const [rows, count] = await Promise.all([
+    prisma.taxFiling.findMany({
+      where,
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.taxFiling.count({ where }),
+  ]);
+
+  return { rows, count, page, pages: Math.max(1, Math.ceil(count / pageSize)) };
+}
+
 /**
  * Reopens a period by deleting its filing.
  *

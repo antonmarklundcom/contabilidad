@@ -455,6 +455,59 @@
     "closePeriod": "Close period",
     "closeBlockedHint": "Resolve the pending documents before closing the period.",
     "closedBy": "Period closed by {user} on {date}",
-    "reopen": "Reopen"
+    "reopen": "Reopen",
+    "filingStatus": {
+      "DRAFT": "Draft",
+      "CLOSED": "Closed",
+      "SUBMITTED": "Submitted",
+      "PAID": "Paid"
+    },
+    "deadline": {
+      "title": "Next filing deadline",
+      "period": "Period",
+      "dueDate": "Due",
+      "daysRemaining": "{days} days remaining",
+      "dueToday": "Due today",
+      "overdue": "Overdue by {days} days",
+      "open": "Open period"
+    },
+    "history": {
+      "title": "Filing history",
+      "detailTitle": "Filing",
+      "backToTaxes": "Back to Taxes",
+      "backToHistory": "Back to history",
+      "searchPlaceholder": "Search by period or closer...",
+      "emptyTitle": "No periods closed yet",
+      "emptyDescription": "Once you close a period in Taxes it will appear here with its receipt.",
+      "period": "Period",
+      "type": "Type",
+      "dueDate": "Due date",
+      "status": "Status",
+      "closedBy": "Closed by",
+      "closedAt": "Closed at",
+      "submittedAt": "Submitted at",
+      "paidAt": "Paid at",
+      "receipt": "Receipt",
+      "viewReceipt": "View receipt",
+      "uploadReceipt": "Upload DNIT receipt",
+      "replaceReceipt": "Replace receipt",
+      "replaceReceiptHint": "Replacing stores a new file; the previous one is never deleted.",
+      "timeline": "Timeline",
+      "actions": "Filing actions",
+      "markSubmitted": "Mark as submitted",
+      "markPaid": "Mark as paid",
+      "closeFirstHint": "Close the period before marking it submitted or paid.",
+      "notes": "Notes",
+      "notesPlaceholder": "Receipt number, observations...",
+      "snapshotHint": "These figures were frozen when the period was closed. Later edits to invoices or expenses do not change them.",
+      "error": {
+        "invalid": "Invalid data.",
+        "not_found": "Filing not found, or that transition is not allowed.",
+        "no_file": "Choose a file.",
+        "bad_type": "The receipt must be a PDF.",
+        "too_large": "The file exceeds 10 MB.",
+        "unreadable": "The file could not be read."
+      }
+    }
   }
 }

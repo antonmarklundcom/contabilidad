@@ -6,6 +6,7 @@ import { formatMoney, formatDate } from "@/lib/i18n";
 import { getSifenMode } from "@/lib/sifen";
 import { dashboardData } from "@/lib/accounting";
 import { PageHeader } from "@/components/page-header";
+import { DeadlineCard } from "@/components/deadline-card";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -138,6 +139,10 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      <div className="mb-6">
+        <DeadlineCard />
       </div>
 
       <div className="mb-6">

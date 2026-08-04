@@ -7,7 +7,17 @@ import path from "path";
  */
 const STORAGE_DIR = path.resolve(process.env.STORAGE_DIR || "./storage");
 
-export const STORAGE_SUBDIRS = ["xml", "kude", "receipts", "exports", "certs", "logos"] as const;
+// "filings" holds DNIT acknowledgement/receipt PDFs for closed periods. Like
+// xml and kude it is a tax document bucket: written once, never deleted.
+export const STORAGE_SUBDIRS = [
+  "xml",
+  "kude",
+  "receipts",
+  "exports",
+  "certs",
+  "logos",
+  "filings",
+] as const;
 export type StorageSubdir = (typeof STORAGE_SUBDIRS)[number];
 
 export function storageRoot(): string {

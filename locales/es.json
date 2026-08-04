@@ -455,6 +455,59 @@
     "closePeriod": "Cerrar período",
     "closeBlockedHint": "Resolvé los documentos pendientes antes de cerrar el período.",
     "closedBy": "Período cerrado por {user} el {date}",
-    "reopen": "Reabrir"
+    "reopen": "Reabrir",
+    "filingStatus": {
+      "DRAFT": "Borrador",
+      "CLOSED": "Cerrado",
+      "SUBMITTED": "Presentado",
+      "PAID": "Pagado"
+    },
+    "deadline": {
+      "title": "Próximo vencimiento",
+      "period": "Período",
+      "dueDate": "Vence el",
+      "daysRemaining": "Faltan {days} días",
+      "dueToday": "Vence hoy",
+      "overdue": "Vencido hace {days} días",
+      "open": "Ver período"
+    },
+    "history": {
+      "title": "Historial de declaraciones",
+      "detailTitle": "Declaración",
+      "backToTaxes": "Volver a Impuestos",
+      "backToHistory": "Volver al historial",
+      "searchPlaceholder": "Buscá por período o responsable...",
+      "emptyTitle": "Todavía no cerraste ningún período",
+      "emptyDescription": "Cuando cierres un período en Impuestos va a aparecer acá con su comprobante.",
+      "period": "Período",
+      "type": "Tipo",
+      "dueDate": "Vencimiento",
+      "status": "Estado",
+      "closedBy": "Cerrado por",
+      "closedAt": "Cerrado el",
+      "submittedAt": "Presentado el",
+      "paidAt": "Pagado el",
+      "receipt": "Comprobante",
+      "viewReceipt": "Ver comprobante",
+      "uploadReceipt": "Subir comprobante DNIT",
+      "replaceReceipt": "Reemplazar comprobante",
+      "replaceReceiptHint": "Al reemplazarlo se guarda un archivo nuevo; el anterior no se borra.",
+      "timeline": "Seguimiento",
+      "actions": "Acciones de la declaración",
+      "markSubmitted": "Marcar como presentada",
+      "markPaid": "Marcar como pagada",
+      "closeFirstHint": "Cerrá el período antes de marcarlo como presentado o pagado.",
+      "notes": "Notas",
+      "notesPlaceholder": "Número de recibo, observaciones...",
+      "snapshotHint": "Estas cifras quedaron congeladas al cerrar el período. No cambian aunque después edites facturas o gastos.",
+      "error": {
+        "invalid": "Datos inválidos.",
+        "not_found": "No se encontró la declaración o la transición no está permitida.",
+        "no_file": "Elegí un archivo.",
+        "bad_type": "El comprobante tiene que ser un PDF.",
+        "too_large": "El archivo supera los 10 MB.",
+        "unreadable": "No se pudo leer el archivo."
+      }
+    }
   }
 }

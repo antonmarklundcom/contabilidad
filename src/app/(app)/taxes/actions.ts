@@ -7,6 +7,8 @@ import { getCompanyId } from "@/lib/company";
 import { setSaldoAnterior, buildForm120, closePeriod, reopenPeriod } from "@/lib/form120";
 import { buildReconciliation } from "@/lib/reconcile";
 import { audit } from "@/lib/audit";
+import { markSubmitted, markPaid, setFilingNotes } from "@/lib/tax/filing";
+import { filingTransitionSchema, filingNotesSchema } from "@/lib/validators";
 
 export async function saveSaldoAnterior(
   year: number,
@@ -50,5 +52,54 @@ export async function reopenPeriodAction(year: number, month: number): Promise<{
   await reopenPeriod(companyId, year, month);
   await audit("reopen", "form120", `${year}-${String(month).padStart(2, "0")}`);
   revalidatePath("/taxes");
+  return { ok: true };
+}
+
+/**
+ * Filing status transitions (Phase 5). Each validates with zod, is scoped to
+ * the session's company inside the lib layer, revalidates and audits.
+ *
+ * A transition that matches no row (wrong id, wrong company, or a status the
+ * transition is not legal from) returns ok:false rather than silently
+ * succeeding — these are tax-record changes and must not be lossy.
+ */
+export async function markSubmittedAction(input: unknown): Promise<{ ok: boolean; error?: string }> {
+  const parsed = filingTransitionSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid" };
+  const companyId = await getCompanyId();
+  const count = await markSubmitted(companyId, parsed.data.filingId, parsed.data.at);
+  if (count === 0) return { ok: false, error: "not_found" };
+  await audit("submit", "taxFiling", parsed.data.filingId, {
+    submittedAt: (parsed.data.at ?? new Date()).toISOString(),
+  });
+  revalidatePath("/taxes");
+  revalidatePath("/taxes/historial");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function markPaidAction(input: unknown): Promise<{ ok: boolean; error?: string }> {
+  const parsed = filingTransitionSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid" };
+  const companyId = await getCompanyId();
+  const count = await markPaid(companyId, parsed.data.filingId, parsed.data.at);
+  if (count === 0) return { ok: false, error: "not_found" };
+  await audit("pay", "taxFiling", parsed.data.filingId, {
+    paidAt: (parsed.data.at ?? new Date()).toISOString(),
+  });
+  revalidatePath("/taxes");
+  revalidatePath("/taxes/historial");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function saveFilingNotesAction(input: unknown): Promise<{ ok: boolean; error?: string }> {
+  const parsed = filingNotesSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "invalid" };
+  const companyId = await getCompanyId();
+  const count = await setFilingNotes(companyId, parsed.data.filingId, parsed.data.notes);
+  if (count === 0) return { ok: false, error: "not_found" };
+  await audit("update", "taxFiling", parsed.data.filingId, { notes: true });
+  revalidatePath("/taxes/historial");
   return { ok: true };
 }
