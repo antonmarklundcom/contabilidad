@@ -69,8 +69,8 @@ afterAll(async () => {
 });
 
 describe.skipIf(!process.env.DATABASE_URL)("f120.closed → TaxFiling data migration", () => {
-  it("copies a legacy Setting close into TaxFiling without deleting the original", async () => {
-    if (!dbAvailable) return;
+  it("copies a legacy Setting close into TaxFiling without deleting the original", async (ctx) => {
+    if (!dbAvailable) ctx.skip();
 
     const legacy = {
       closedBy: "contador@example.com",
@@ -103,8 +103,8 @@ describe.skipIf(!process.env.DATABASE_URL)("f120.closed → TaxFiling data migra
     expect(JSON.parse(original!.value)).toEqual(legacy);
   });
 
-  it("is idempotent — re-running creates no duplicate and clobbers nothing", async () => {
-    if (!dbAvailable) return;
+  it("is idempotent — re-running creates no duplicate and clobbers nothing", async (ctx) => {
+    if (!dbAvailable) ctx.skip();
 
     const before = await prisma.taxFiling.findUnique({
       where: { companyId_type_year_month: { companyId, type: "IVA", year: 2026, month: 5 } },
@@ -126,8 +126,8 @@ describe.skipIf(!process.env.DATABASE_URL)("f120.closed → TaxFiling data migra
     expect(rows[0].status).toBe("SUBMITTED");
   });
 
-  it("rolls a December period into January of the next year", async () => {
-    if (!dbAvailable) return;
+  it("rolls a December period into January of the next year", async (ctx) => {
+    if (!dbAvailable) ctx.skip();
 
     await prisma.setting.create({
       data: {
@@ -149,8 +149,8 @@ describe.skipIf(!process.env.DATABASE_URL)("f120.closed → TaxFiling data migra
     expect(filing!.dueDate.toISOString().slice(0, 10)).toBe("2026-01-15");
   });
 
-  it("ignores Setting rows that are not period closes", async () => {
-    if (!dbAvailable) return;
+  it("ignores Setting rows that are not period closes", async (ctx) => {
+    if (!dbAvailable) ctx.skip();
 
     await prisma.setting.createMany({
       data: [
@@ -167,8 +167,8 @@ describe.skipIf(!process.env.DATABASE_URL)("f120.closed → TaxFiling data migra
     expect(all).toHaveLength(2);
   });
 
-  it("survives a malformed close blob instead of aborting the migration", async () => {
-    if (!dbAvailable) return;
+  it("survives a malformed close blob instead of aborting the migration", async (ctx) => {
+    if (!dbAvailable) ctx.skip();
 
     await prisma.setting.create({
       data: { companyId, key: "f120.closed.2026-07", value: "this is not json" },

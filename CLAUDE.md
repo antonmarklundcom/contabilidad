@@ -45,6 +45,12 @@ KuDE PDF is `src/lib/kude.ts` (pdfkit + `qrcode`). In mock mode it stamps a "SIN
 - `src/lib/jobs/handlers.ts` — dispatch: `send_dte`, `query_status`, `generate_kude`, `cancel_dte`, `backup`.
 - `/api/cron` — authenticated by `x-cron-secret`; also enqueues the nightly backup if due.
 
+## Tax calendar & filings (`src/lib/tax/`)
+
+- `calendar.ts` — SET's perpetual calendar: due dates keyed by the **last digit of the RUC** (excluding the DV). `PERPETUAL_CALENDAR` is a flat data table so a SET resolution change is a one-line edit — do not turn it back into arithmetic. Pure, no I/O. Non-working days roll **forward**; decree-declared asuetos are not perpetual and are passed in via `options.extraHolidays` rather than baked in. ⚠️ The digit→day table still needs verification against a primary DNIT document.
+- `filing.ts` — the `TaxFiling` record: `closePeriod`/`getPeriodClose`/`reopenPeriod` (re-exported from `form120.ts` for existing callers), the status transitions, and the archive query. **Snapshots are immutable**: reopening deletes the filing, it never edits one. Every mutation is scoped by `companyId` as well as `id` — never trust an id alone.
+- `deadline.ts` — the "next filing due" summary behind the deadline card.
+
 ## Accounting
 
 `src/lib/accounting.ts` — `libroVentas` (approved invoices), `libroCompras` (confirmed expenses), `dashboardData` (income/expense + IVA débito/crédito position), `monthlyTrend`. Libros export CSV/XLSX via `/api/export/libro`.
@@ -62,7 +68,7 @@ KuDE PDF is `src/lib/kude.ts` (pdfkit + `qrcode`). In mock mode it stamps a "SIN
 
 ## Storage & crypto
 
-- `src/lib/storage.ts` — local disk under `STORAGE_DIR` (`/xml`, `/kude`, `/receipts`, `/exports`, `/certs`, `/logos`). Reads are confined to the storage root. **Tax docs are never deleted.**
+- `src/lib/storage.ts` — local disk under `STORAGE_DIR` (`/xml`, `/kude`, `/receipts`, `/exports`, `/certs`, `/logos`, `/filings`). Reads are confined to the storage root. **Tax docs are never deleted.** `/filings` holds DNIT acknowledgement PDFs for closed periods; "replacing" one writes a *new* file and repoints the `TaxFiling`, leaving the old file on disk. Add a bucket by extending `STORAGE_SUBDIRS` — never write outside it.
 - `src/lib/crypto.ts` — AES-256-GCM (`ENCRYPTION_KEY`, 32 bytes hex) for the `.p12` and its password. Cert expiry is read with `node-forge` (no JDK needed).
 
 ## Conventions

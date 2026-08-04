@@ -130,3 +130,18 @@ export const expenseSchema = z.object({
 
 export type ExpenseInput = z.infer<typeof expenseSchema>;
 export type ExpenseItemInput = z.infer<typeof expenseItemSchema>;
+
+/** Filing status transitions on /taxes (Phase 5). */
+export const filingTransitionSchema = z.object({
+  filingId: z.string().trim().min(1).max(64),
+  /** Optional explicit date; defaults to now when omitted. */
+  at: z.coerce.date().optional(),
+});
+
+export const filingNotesSchema = z.object({
+  filingId: z.string().trim().min(1).max(64),
+  notes: z.string().trim().max(2000),
+});
+
+export type FilingTransitionInput = z.infer<typeof filingTransitionSchema>;
+export type FilingNotesInput = z.infer<typeof filingNotesSchema>;
