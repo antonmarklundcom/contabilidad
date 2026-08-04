@@ -125,50 +125,12 @@ export async function setSaldoAnterior(
   });
 }
 
-export interface PeriodClose {
-  closedBy: string;
-  closedAt: string;
-  snapshot: Form120Data;
-}
-
-const closeKey = (year: number, month: number) =>
-  `f120.closed.${year}-${String(month).padStart(2, "0")}`;
-
-export async function getPeriodClose(
-  companyId: string,
-  year: number,
-  month: number
-): Promise<PeriodClose | null> {
-  const setting = await prisma.setting.findUnique({
-    where: { companyId_key: { companyId, key: closeKey(year, month) } },
-  });
-  if (!setting) return null;
-  try {
-    return JSON.parse(setting.value) as PeriodClose;
-  } catch {
-    return null;
-  }
-}
-
-/** Records human sign-off and freezes the figures as of close time. Idempotent — closing again overwrites the snapshot. */
-export async function closePeriod(
-  companyId: string,
-  year: number,
-  month: number,
-  closedBy: string,
-  snapshot: Form120Data
-): Promise<void> {
-  const value: PeriodClose = { closedBy, closedAt: new Date().toISOString(), snapshot };
-  await prisma.setting.upsert({
-    where: { companyId_key: { companyId, key: closeKey(year, month) } },
-    update: { value: JSON.stringify(value) },
-    create: { companyId, key: closeKey(year, month), value: JSON.stringify(value) },
-  });
-}
-
-export async function reopenPeriod(companyId: string, year: number, month: number): Promise<void> {
-  await prisma.setting.deleteMany({ where: { companyId, key: closeKey(year, month) } });
-}
+/**
+ * Period close moved to the `TaxFiling` model in `src/lib/tax/filing.ts`.
+ * Re-exported here so existing callers keep the import path they had; the
+ * signatures are unchanged.
+ */
+export { getPeriodClose, closePeriod, reopenPeriod, type PeriodClose } from "@/lib/tax/filing";
 
 export async function buildForm120(
   companyId: string,
