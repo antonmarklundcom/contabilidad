@@ -77,6 +77,26 @@ KuDE PDF is `src/lib/kude.ts` (pdfkit + `qrcode`). In mock mode it stamps a "SIN
 
 `tests/` (Vitest, `npm test`): RUC check digit vs the library, CDC format + library equality, IVA/totals math, and sequence increment under concurrency (skips gracefully if no DB). These protect money; keep them green.
 
+## Database changes
+
+The schema has a real migration history under `prisma/migrations/`, starting
+from `20260804000000_baseline` (generated from the schema as it stood when CI
+was introduced — it is the state of the app at that commit, not a from-scratch
+design).
+
+- **Every change to `schema.prisma` ships with a migration in the same commit.**
+  `npx prisma migrate dev --name <what_changed>`. CI replays the migrations into
+  a shadow database and diffs against the schema; drift fails the build.
+- `npm run db:push` is for local scratch work only. It writes no migration and
+  will make CI fail on the next PR that touches the schema.
+- **Existing deployments** created with `db push` before the baseline existed
+  must adopt it once, or `migrate deploy` will try to recreate every table:
+  `npx prisma migrate resolve --applied 20260804000000_baseline`.
+- **Data migrations** (moving rows, not just changing shape — e.g. lifting the
+  `PeriodClose` blob out of `Setting`) go in the migration's SQL when they can
+  be expressed there, and must be idempotent. Tax documents are never deleted:
+  a data migration copies and leaves the original, it does not move-and-drop.
+
 ## Gotchas
 
 - `next.config.ts` lists the native/SIFEN packages in `serverExternalPackages` so they aren't bundled. ESLint is `ignoreDuringBuilds` (run `npm run lint` separately).
