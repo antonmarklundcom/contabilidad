@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: facturapy
+          POSTGRES_PASSWORD: facturapy
+          POSTGRES_DB: facturapy_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U facturapy"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # The sequence test runs for real against this DB instead of skipping.
+      DATABASE_URL: postgresql://facturapy:facturapy@localhost:5432/facturapy_test
+      # Build-time only; no secrets, no real SIFEN calls.
+      NEXTAUTH_SECRET: ci-not-a-real-secret
+      NEXTAUTH_URL: http://localhost:3000
+      SIFEN_MODE: mock
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      STORAGE_DIR: /tmp/facturapy-storage
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Guards the convention that every schema.prisma change ships with a
+      # migration: replay prisma/migrations into a throwaway shadow database
+      # and diff the result against the schema. Any drift fails the build.
+      - name: Schema and migrations are in sync
+        run: |
+          PGPASSWORD=facturapy psql -h localhost -U facturapy -d facturapy_test \
+            -c 'CREATE DATABASE facturapy_shadow'
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url postgresql://facturapy:facturapy@localhost:5432/facturapy_shadow \
+            --exit-code
+
+      # Applies prisma/migrations to the CI database so the DB-backed tests
+      # (tests/sequence.test.ts) run for real instead of skipping.
+      - run: npx prisma migrate deploy
+
+      - run: npm run lint
+
+      - run: npm test
+
+      - run: npm run build

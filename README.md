@@ -110,8 +110,9 @@ Nothing else in the code changes — every SIFEN call goes through the adapter (
 | `npm run build` | `prisma generate` + `next build` (standalone) |
 | `npm start` | Production server |
 | `npm test` | Vitest (RUC check digit, CDC format, IVA/totals math, sequence concurrency) |
-| `npm run db:push` | Push schema to the DB (no migration files) |
-| `npm run db:migrate` | Apply migrations (production) |
+| `npm run db:push` | Push schema to the DB, no migration files — **local scratch only** |
+| `npm run db:migrate` | Apply `prisma/migrations` (production, CI) |
+| `npx prisma migrate dev --name <change>` | Create a migration — required for every schema change |
 | `npm run db:seed` | Seed admin user + demo data |
 
 ---
