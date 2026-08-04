@@ -10,7 +10,7 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 | 2 | Item-level deducibility | **Shipped** (`deductibility.ts`, `ExpenseItem`) |
 | 3 | Marangatú/e-Kuatia import & matching | **Shipped** (`marangatu-import.ts`, `/api/expenses/import`) |
 | 4 | Delivery & polish | Partial — `mailer.ts` exists, no report/reminder jobs |
-| 5 | Compliance calendar & filing archive | **Next** |
+| 5 | Compliance calendar & filing archive | **Mostly shipped** — 5.1–5.5 done (PRs #7 #8 #9); 5.6–5.8 (reminder/expiry jobs, `send_report`, paste-a-CDC) still open |
 | 6 | Document vault & client portal roles | Planned |
 | 7 | Annual IRP return | Planned |
 | 8 | Intake channels (WhatsApp, one-time invoice link) | Planned, gated |
@@ -98,8 +98,14 @@ Competitor B's two strongest portal screens — "next deadline, N days remaining
 3. **Filing status transitions** — ✅ **shipped**. Mark submitted / mark paid server actions (zod-validated, `audit()`ed, company-scoped), plus an upload slot for the DNIT receipt PDF in a new `STORAGE_DIR/filings` bucket. Replacing a receipt writes a new file and repoints the filing; the previous one stays on disk.
 4. **`/taxes/historial`** — ✅ **shipped**. Filing list using the standard `list-controls` conventions (search, date range, status, pagination, CSV via `/api/export/filings`), each row drilling into `/taxes/historial/[id]`: the frozen snapshot's casilla table, the lifecycle timeline, the receipt PDF and a notes field.
 5. **Deadline card** — ✅ **shipped**. `src/components/deadline-card.tsx` on both the dashboard and `/taxes`: next filing, due date, days remaining, current status. An unsubmitted filing already past its due date outranks the upcoming one, since that is the more urgent thing to show. Renders nothing when the RUC cannot be parsed rather than showing a date we cannot stand behind.
-6. **Reminder + expiry jobs** — new `filing_reminder` job type in `jobs/handlers.ts`, enqueued from `/api/cron` when `calendar.ts` says a filing is due in N days (default 10/3/1) and the period isn't `SUBMITTED`. Same job covers **timbrado expiry** (`Company.timbradoFechaInicio`/fin) and **certificate expiry** (already read by `crypto.ts` via node-forge) at 60/30/7 days. Email through `mailer.ts`; no-op cleanly when SMTP is unconfigured.
-7. **Phase 4 items 1 & 3 land here**: `send_report` job emailing the monthly close PDF after `closePeriod()`.
+6. **Reminder + expiry jobs** — ⏳ **not started**. New `filing_reminder` job type in `jobs/handlers.ts`, enqueued from `/api/cron` when `calendar.ts` says a filing is due in N days (default 10/3/1) and the period isn't `SUBMITTED`. Same job covers **timbrado expiry** (`Company.timbradoFechaInicio`/fin) and **certificate expiry** (already read by `crypto.ts` via node-forge) at 60/30/7 days. Email through `mailer.ts`; no-op cleanly when SMTP is unconfigured.
+7. **Phase 4 items 1 & 3 land here**: ⏳ **not started**. `send_report` job emailing the monthly close PDF after `closePeriod()`.
+
+**Groundwork notes for 5.6/5.7** (from a scoping pass, not yet built):
+- `Company` has `timbradoFechaInicio` but **no `timbradoFechaFin`** — timbrado expiry alerting needs that column added (nullable) plus a migration.
+- Certificate expiry needs no new field: `Company.certExpiresAt` is already populated.
+- Deduplication ("never send the same reminder twice") wants a `NotificationLog` model keyed unique on `(companyId, kind, subject, threshold)`, where the sender inserts first and treats a unique violation as "already sent" — atomic, matching how the job runner claims jobs with `updateMany`.
+- `mailer.ts` already exposes `smtpConfigured()`; the jobs must no-op cleanly when it returns false.
 8. **Paste-a-CDC consulta** (carried from Phase 3.2) — verify a received document through the SIFEN adapter before trusting it.
 
 ## Phase 6 — Document vault & client portal roles
