@@ -17,6 +17,7 @@ import {
   LogOut,
   Menu,
   X,
+  FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
@@ -39,6 +40,7 @@ const NAV = [
   { href: "/expenses", key: "nav.expenses", icon: Receipt },
   { href: "/books", key: "nav.books", icon: BookOpen },
   { href: "/taxes", key: "nav.taxes", icon: Landmark },
+  { href: "/documents", key: "nav.documents", icon: FolderOpen },
   { href: "/reports", key: "nav.reports", icon: BarChart3 },
   { href: "/settings", key: "nav.settings", icon: Settings },
 ] as const;

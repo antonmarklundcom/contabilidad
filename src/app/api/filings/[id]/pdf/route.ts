@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { saveFile, readFile } from "@/lib/storage";
 import { attachOfficialPdf } from "@/lib/tax/filing";
 import { audit } from "@/lib/audit";
+import { linkExistingFile } from "@/lib/documents";
 
 /**
  * The DNIT receipt PDF for a filing.
@@ -49,6 +50,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const stored = await saveFile("filings", `dnit-${filing.type}-${period}-${stamp}.pdf`, buffer);
 
   await attachOfficialPdf(companyId, filing.id, stored);
+  // The vault is not a second silo: the receipt shows up under /documents
+  // pointing at this very file (PLAN Phase 6.2).
+  await linkExistingFile({
+    companyId,
+    kind: "FILING",
+    title: `DNIT ${filing.type} ${period}`,
+    filePath: stored,
+    mimeType: "application/pdf",
+    sizeBytes: buffer.length,
+    receivedAt: new Date(),
+    uploadedBy: session.user.email ?? session.user.name ?? null,
+  });
   await audit("upload", "taxFiling", filing.id, { officialPdf: true, period });
 
   return NextResponse.json({ ok: true });

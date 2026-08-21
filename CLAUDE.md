@@ -72,7 +72,7 @@ Tax modules live directly in `src/lib/` (not `src/lib/tax/` — see ARCHITECTURE
 
 ## Storage & crypto
 
-- `src/lib/storage.ts` — local disk under `STORAGE_DIR` (`/xml`, `/kude`, `/receipts`, `/exports`, `/certs`, `/logos`, `/filings`). Reads are confined to the storage root. **Tax docs are never deleted.** `/filings` holds DNIT acknowledgement PDFs for closed periods; "replacing" one writes a *new* file and repoints the `TaxFiling`, leaving the old file on disk. Add a bucket by extending `STORAGE_SUBDIRS` — never write outside it.
+- `src/lib/storage.ts` — local disk under `STORAGE_DIR` (`/xml`, `/kude`, `/receipts`, `/exports`, `/certs`, `/logos`, `/filings`, `/documents`). Reads are confined to the storage root. **Tax docs are never deleted.** `/filings` holds DNIT acknowledgement PDFs for closed periods and `/documents` the vault's uploads (`src/lib/documents.ts`, `/documents` route — every read and write scoped by `companyId` as well as id); "replacing" one writes a *new* file and repoints the `TaxFiling`, leaving the old file on disk. Add a bucket by extending `STORAGE_SUBDIRS` — never write outside it.
 - `src/lib/crypto.ts` — AES-256-GCM (`ENCRYPTION_KEY`, 32 bytes hex) for the `.p12` and its password. Cert expiry is read with `node-forge` (no JDK needed).
 
 ## Conventions

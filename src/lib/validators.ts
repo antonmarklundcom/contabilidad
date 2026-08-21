@@ -143,5 +143,25 @@ export const filingNotesSchema = z.object({
   notes: z.string().trim().max(2000),
 });
 
+export const documentKindSchema = z.enum([
+  "BANK_STATEMENT",
+  "DNIT_NOTICE",
+  "CONTRACT",
+  "CERTIFICATE",
+  "FILING",
+  "OTHER",
+]);
+
+/** Metadata of a vault document. The file itself is uploaded separately. */
+export const documentMetaSchema = z.object({
+  documentId: z.string().trim().min(1).max(64),
+  title: z.string().trim().min(1).max(255),
+  kind: documentKindSchema,
+  receivedAt: z.coerce.date(),
+  notes: z.string().trim().max(2000).default(""),
+});
+
+export type DocumentMetaInput = z.infer<typeof documentMetaSchema>;
+
 export type FilingTransitionInput = z.infer<typeof filingTransitionSchema>;
 export type FilingNotesInput = z.infer<typeof filingNotesSchema>;

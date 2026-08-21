@@ -11,7 +11,7 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 | 3 | Marangatú import & matching | **Shipped** (`marangatu-import.ts`, `/api/expenses/import`) — CSV/XLSX export only; XML DE + CDC check open, see Phase 3 note |
 | 4 | Delivery & polish | Partial — `mailer.ts` exists, no report/reminder jobs |
 | 5 | Compliance calendar & filing archive | **Mostly shipped** — 5.1–5.5 done (PRs #7 #8 #9); 5.6 (reminder/expiry jobs), 5.7 (`send_report` + pre-computed draft), 5.9 (sequence-gap check) and 5.10 (filing status guards) done; 5.8 (paste-a-CDC) still open |
-| 6 | Document vault & client portal roles | Planned |
+| 6 | Document vault & client portal roles | **In progress** — 6.1–6.2 (vault) shipped; 6.3 roles and 6.4 multi-tenant activation open |
 | 7 | Annual IRP return | Planned |
 | 8 | Intake channels (WhatsApp, one-time invoice link) | Planned, gated |
 | 9 | Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split | Planned, next (proposed in PR #10, merged; mechanics corrected below) |
@@ -118,8 +118,8 @@ Competitor B's two strongest portal screens — "next deadline, N days remaining
 
 Their "Mailbox" screen, minus the physical mail operation. This is what makes the app usable *by the client* rather than only by the bookkeeper.
 
-1. **`Document` model** — `companyId, kind (BANK_STATEMENT|DNIT_NOTICE|CONTRACT|CERTIFICATE|FILING|OTHER), title, filePath, mimeType, sizeBytes, receivedAt, uploadedBy, notes`. Files go under a new `STORAGE_DIR/documents` bucket, read-confined like every other bucket.
-2. **`/documents` route** — upload, list (standard list-controls), download, tag by kind. Filing PDFs from Phase 5 appear here automatically rather than being a second silo.
+1. **`Document` model** — ✅ **shipped** as described (`companyId, kind, title, filePath, mimeType, sizeBytes, receivedAt, uploadedBy, notes`), in the `document_vault` migration, with a new read-confined `STORAGE_DIR/documents` bucket. Uploads are type- and size-checked server-side (documents only, 20 MB); files are written once and never deleted, like every other tax-document bucket.
+2. **`/documents` route** — ✅ **shipped**. Upload dialog, list with the standard list-controls (search, kind filter, date range, pagination, CSV via `/api/export/documents`), download through `/api/documents/[id]`. Uploading a DNIT receipt on a filing also records a `FILING` document pointing at the same file (`linkExistingFile`, idempotent on the path), so the vault is not a second silo. `src/lib/documents.ts` scopes every read and write by `companyId` as well as id — covered by deny-path tests in `tests/documents.test.ts`.
 3. **Role enforcement** — `User.role` (`admin` | `accountant` | `client`) is currently declared and never checked. Enforce in `middleware.ts` *and* in each server action (never trust the route alone): `client` = read own company, upload documents/receipts, no emission, no settings, no period close. Add tests for the deny paths.
 4. **Multi-tenant activation** (carried from Phase 4.4) — scope `getCompanyId()` to the session. The estudio channel in STRATEGY depends on 3 + 4 together.
 
