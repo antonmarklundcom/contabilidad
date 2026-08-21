@@ -37,7 +37,15 @@ export async function closePeriodAction(
   const session = await getServerSession(authOptions);
   const closedBy = session?.user?.email ?? session?.user?.name ?? "unknown";
   const snapshot = await buildForm120(companyId, year, month);
-  await closePeriod(companyId, year, month, closedBy, snapshot);
+  const result = await closePeriod(companyId, year, month, closedBy, snapshot);
+  if (!result.ok) {
+    // The filing was already presented to DNIT: its snapshot is a declared
+    // fact and must not be rewritten.
+    await audit("close_refused", "form120", `${year}-${String(month).padStart(2, "0")}`, {
+      status: result.status,
+    });
+    return { ok: false, error: "locked" };
+  }
   await audit("close", "form120", `${year}-${String(month).padStart(2, "0")}`, {
     closedBy,
     aPagar: snapshot.aPagar,
@@ -47,11 +55,20 @@ export async function closePeriodAction(
   return { ok: true };
 }
 
-export async function reopenPeriodAction(year: number, month: number): Promise<{ ok: boolean }> {
+export async function reopenPeriodAction(
+  year: number,
+  month: number
+): Promise<{ ok: boolean; error?: string }> {
   const companyId = await getCompanyId();
-  await reopenPeriod(companyId, year, month);
-  await audit("reopen", "form120", `${year}-${String(month).padStart(2, "0")}`);
+  const period = `${year}-${String(month).padStart(2, "0")}`;
+  const result = await reopenPeriod(companyId, year, month);
+  if (!result.ok) {
+    await audit("reopen_refused", "form120", period, { status: result.status });
+    return { ok: false, error: "locked" };
+  }
+  await audit("reopen", "form120", period);
   revalidatePath("/taxes");
+  revalidatePath("/taxes/historial");
   return { ok: true };
 }
 

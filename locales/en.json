@@ -456,6 +456,7 @@
     "closeBlockedHint": "Resolve the pending documents before closing the period.",
     "closedBy": "Period closed by {user} on {date}",
     "reopen": "Reopen",
+    "filingLockedHint": "This filing was already submitted to DNIT: its figures are frozen and cannot be reopened or re-closed.",
     "filingStatus": {
       "DRAFT": "Draft",
       "CLOSED": "Closed",
