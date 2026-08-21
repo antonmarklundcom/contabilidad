@@ -19,6 +19,7 @@ export async function saveCompany(input: {
   nombreFantasia: string;
   timbradoNumero: string;
   timbradoFechaInicio: string;
+  timbradoFechaFin: string;
   tipoContribuyente: number;
   tipoRegimen: number | null;
   direccion: string;
@@ -46,6 +47,9 @@ export async function saveCompany(input: {
       nombreFantasia: input.nombreFantasia || null,
       timbradoNumero: input.timbradoNumero,
       timbradoFechaInicio: new Date(input.timbradoFechaInicio),
+      // Optional: blank means "not recorded", which silences expiry reminders
+      // rather than inventing a date.
+      timbradoFechaFin: input.timbradoFechaFin ? new Date(input.timbradoFechaFin) : null,
       tipoContribuyente: input.tipoContribuyente,
       tipoRegimen: input.tipoRegimen,
       direccion: input.direccion,

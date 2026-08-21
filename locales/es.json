@@ -357,6 +357,8 @@
     "nombreFantasia": "Nombre de fantasía",
     "timbrado": "Timbrado",
     "timbradoDate": "Inicio de vigencia del timbrado",
+    "timbradoDateEnd": "Fin de vigencia del timbrado",
+    "timbradoDateEndHint": "Opcional. Si lo cargás, te avisamos por correo 60, 30 y 7 días antes del vencimiento.",
     "actividades": "Actividades económicas",
     "actividadCodigo": "Código",
     "actividadDescripcion": "Descripción",
@@ -510,5 +512,20 @@
         "unreadable": "No se pudo leer el archivo."
       }
     }
+  },
+  "notifications": {
+    "filing_due": {
+      "subject": "{company} — el IVA del período {detail} vence el {date}",
+      "body": "Recordatorio: la declaración de IVA (Formulario 120) del período {detail} vence el {date}.\n\nEntrá a Impuestos para revisar el borrador y cerrar el período. El borrador es de trabajo: la presentación en Marangatu la hacés vos."
+    },
+    "timbrado_expiry": {
+      "subject": "{company} — el timbrado {detail} vence el {date}",
+      "body": "Recordatorio: tu timbrado {detail} vence el {date}.\n\nGestioná la renovación ante la DNIT antes de esa fecha; sin timbrado vigente no vas a poder emitir documentos electrónicos."
+    },
+    "cert_expiry": {
+      "subject": "{company} — tu certificado digital vence el {date}",
+      "body": "Recordatorio: el certificado digital que usás para firmar los documentos electrónicos vence el {date}.\n\nRenovalo con tu prestador y subí el nuevo archivo .p12 en Configuración antes de esa fecha."
+    },
+    "footer": "Este es un aviso automático de FacturaPY. No respondas a este correo."
   }
 }

@@ -29,6 +29,7 @@ Next.js 15 App Router (standalone, single process)
 │   ├── tax-report.ts          F.120 / monthly close PDFs (pdfkit)
 │   ├── deductibility.ts       per-item IVA + deducible totals (pure math)
 │   ├── marangatu-import.ts    Marangatú CSV/XLSX comprobante-export parser
+│   ├── notifications.ts       reminder ladder + NotificationLog dedup
 │   ├── tax/                   calendar.ts (perpetual due dates), filing.ts
 │   │                          (TaxFiling lifecycle), filing-status.ts (pure
 │   │                          immutability guards), deadline.ts (next-due card)
@@ -43,8 +44,8 @@ Next.js 15 App Router (standalone, single process)
 └── Prisma/PostgreSQL
     User, Company, Establishment, ExpeditionPoint, DocumentSequence,
     Client, Product, Invoice, InvoiceLine, ExpenseCategory, Expense,
-    ExpenseItem, SupplierCategoryMap, TaxFiling, JobQueue, SifenLog,
-    AuditLog, Setting
+    ExpenseItem, SupplierCategoryMap, TaxFiling, NotificationLog, JobQueue,
+    SifenLog, AuditLog, Setting
 ```
 
 Load-bearing invariants (do not weaken while extending):
@@ -107,10 +108,10 @@ No Marangatú credentials, ever: import is user-initiated file upload; verificat
 
 ## Extension 3 — Delivery (PLAN Phase 4)
 
-> **Status: calendar shipped (`src/lib/tax/calendar.ts`, PLAN Phase 5.1); the `send_report` and reminder jobs are still open** — `jobs/handlers.ts` today dispatches only `send_dte`, `query_status`, `generate_kude`, `cancel_dte`, `backup`.
+> **Status: calendar shipped (PLAN 5.1) and the reminder job shipped (PLAN 5.6, `src/lib/notifications.ts` + the `filing_reminder` job scanned from `/api/cron`); `send_report` is still open** — `jobs/handlers.ts` today dispatches `send_dte`, `query_status`, `generate_kude`, `cancel_dte`, `backup`, `filing_reminder`.
 
-- `send_report` job: `mailer.ts` + PDF attachment from storage. Enqueued on period close.
-- Cron: `/api/cron` already runs due jobs; add a due-date check that enqueues a reminder based on SET's perpetual calendar (RUC last digit → due day), stored as data in `tax/calendar.ts`.
+- `send_report` job: `mailer.ts` + PDF attachment from storage. Enqueued on period close. Still open (PLAN 5.7).
+- Cron: `/api/cron` runs due jobs and, since PLAN 5.6, scans for reminders — filing due dates from `tax/calendar.ts`, timbrado and certificate expiry from `Company` — deduped by `NotificationLog` (insert-first, unique violation = already sent) and no-op without SMTP.
 - WhatsApp stays share-intent (honest manual attach) until/unless WhatsApp Business API is adopted; that would be a new `src/lib/whatsapp.ts` behind its own interface, mockable like the SIFEN adapter.
 
 ## Extension 4 — Marketing/app domain split (PLAN Phase 9)
@@ -137,6 +138,6 @@ Still missing, and worth building before the modules are touched again:
 - Golden-file tests for `marangatu-import.ts` — STRATEGY's format-drift mitigation assumes these exist; they don't.
 - Reconciliation golden-file tests (period fixture → expected findings list) — `reconcile.ts` currently has no tests at all.
 - `tests/parse-de.test.ts` — sample DE XML → parsed DTO → CDC re-validation (when the XML lane is built).
-Also shipped: `tests/tax-filing-guards.test.ts` — deny paths for the Phase 5.10 filing status guards (reopen/re-close of `SUBMITTED`/`PAID` refuse and leave the row intact).
+Also shipped: `tests/notifications.test.ts` (reminder threshold ladder, both-locale copy, DB dedup/no-SMTP/recipient roles) and `tests/tax-filing-guards.test.ts` — deny paths for the Phase 5.10 filing status guards (reopen/re-close of `SUBMITTED`/`PAID` refuse and leave the row intact).
 
 All follow the existing Vitest setup and the "skips gracefully if no DB" pattern where DB-bound.

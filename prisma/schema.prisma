@@ -42,6 +42,9 @@ model Company {
   actividades          Json
   timbradoNumero       String
   timbradoFechaInicio  DateTime
+  // End of the timbrado's validity. Nullable: older companies never recorded
+  // it, and a company without it simply gets no timbrado expiry reminders.
+  timbradoFechaFin     DateTime?
   tipoContribuyente    Int      @default(2) // 1=Física, 2=Jurídica
   tipoRegimen          Int?     // SIFEN tipoRegimen (8=Régimen general…)
   direccion            String
@@ -76,6 +79,7 @@ model Company {
   auditLogs        AuditLog[]
   settings         Setting[]
   taxFilings       TaxFiling[]
+  notificationLogs NotificationLog[]
 }
 
 /// A tax return for one period: the durable record that replaces the
@@ -474,7 +478,7 @@ enum JobStatus {
 
 model JobQueue {
   id          String    @id @default(cuid())
-  type        String    // send_dte | query_status | generate_kude | cancel_dte | backup
+  type        String    // send_dte | query_status | generate_kude | cancel_dte | backup | filing_reminder
   payload     Json
   status      JobStatus @default(PENDING)
   attempts    Int       @default(0)
@@ -485,6 +489,28 @@ model JobQueue {
   updatedAt   DateTime  @updatedAt
 
   @@index([status, nextRunAt])
+}
+
+// ── Compliance reminders (filing due, timbrado / certificate expiry) ────────
+
+/// One row per reminder actually sent. The unique constraint IS the dedup:
+/// the scanner inserts before queueing and treats a unique violation as
+/// "already sent", so a cron that fires every five minutes still mails once.
+/// `subject` identifies the thing expiring (period, timbrado number + end
+/// date, certificate expiry date) so a renewal alerts afresh.
+model NotificationLog {
+  id        String   @id @default(cuid())
+  companyId String
+  kind      String   // filing_due | timbrado_expiry | cert_expiry
+  subject   String
+  threshold Int      // days-before-due ladder step this row covers
+  recipient String?
+  sentAt    DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, kind, subject, threshold])
+  @@index([companyId, sentAt])
 }
 
 // ── SIFEN raw request/response log (audit & debugging) ──────────────────────

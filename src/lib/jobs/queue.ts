@@ -6,7 +6,8 @@ export type JobType =
   | "query_status"
   | "generate_kude"
   | "cancel_dte"
-  | "backup";
+  | "backup"
+  | "filing_reminder";
 
 export async function enqueueJob(
   type: JobType,

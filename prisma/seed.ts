@@ -78,6 +78,9 @@ async function main() {
       ],
       timbradoNumero: "12345678",
       timbradoFechaInicio: monthsAgo(5),
+      // Demo timbrado runs a year from its start, so the expiry reminder has
+      // something to work with in a seeded environment.
+      timbradoFechaFin: monthsAgo(-7),
       tipoContribuyente: 2,
       tipoRegimen: 8,
       direccion: "Avda. Demo c/ Calle Ficticia",

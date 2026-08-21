@@ -357,6 +357,8 @@
     "nombreFantasia": "Trade name",
     "timbrado": "Timbrado (stamping) number",
     "timbradoDate": "Timbrado validity start",
+    "timbradoDateEnd": "Timbrado validity end",
+    "timbradoDateEndHint": "Optional. If you fill it in, we email you 60, 30 and 7 days before it expires.",
     "actividades": "Economic activities",
     "actividadCodigo": "Code",
     "actividadDescripcion": "Description",
@@ -510,5 +512,20 @@
         "unreadable": "The file could not be read."
       }
     }
+  },
+  "notifications": {
+    "filing_due": {
+      "subject": "{company} — VAT for period {detail} is due on {date}",
+      "body": "Reminder: the VAT return (Formulario 120) for period {detail} is due on {date}.\n\nOpen Taxes to review the draft and close the period. The draft is a working document — you file it in Marangatu yourself."
+    },
+    "timbrado_expiry": {
+      "subject": "{company} — timbrado {detail} expires on {date}",
+      "body": "Reminder: your timbrado {detail} expires on {date}.\n\nRenew it with DNIT before that date; without a valid timbrado you cannot issue electronic documents."
+    },
+    "cert_expiry": {
+      "subject": "{company} — your digital certificate expires on {date}",
+      "body": "Reminder: the digital certificate you use to sign electronic documents expires on {date}.\n\nRenew it with your provider and upload the new .p12 file in Settings before that date."
+    },
+    "footer": "This is an automatic notice from FacturaPY. Please do not reply to this email."
   }
 }

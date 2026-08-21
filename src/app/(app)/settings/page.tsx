@@ -50,6 +50,7 @@ export default async function SettingsPage() {
     nombreFantasia: company.nombreFantasia ?? "",
     timbradoNumero: company.timbradoNumero,
     timbradoFechaInicio: company.timbradoFechaInicio.toISOString().slice(0, 10),
+    timbradoFechaFin: company.timbradoFechaFin?.toISOString().slice(0, 10) ?? "",
     tipoContribuyente: company.tipoContribuyente,
     tipoRegimen: company.tipoRegimen,
     direccion: company.direccion,
