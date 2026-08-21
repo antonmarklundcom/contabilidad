@@ -14,7 +14,7 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 | 6 | Document vault & client portal roles | Planned |
 | 7 | Annual IRP return | Planned |
 | 8 | Intake channels (WhatsApp, one-time invoice link) | Planned, gated |
-| 9 | Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split | Planned (proposed in PR #10; mechanics corrected below) |
+| 9 | Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split | Planned, next (proposed in PR #10, merged; mechanics corrected below) |
 
 ## Context — competitor A: the AI accountant
 
@@ -142,7 +142,7 @@ Lowering the friction of getting a receipt into the books. Both are real product
 
 ## Phase 9 — Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split
 
-Proposed in PR #10; this section is that plan with the mechanics corrected after an audit pass (PR #10's sketch was never build-tested and has two blockers as written). The goal stands: `contador.com.py` reads as a normal Paraguayan accounting *firm* (SEO-optimized, no SaaS framing) while the software lives at `sistema.contador.com.py` — one Next.js process, one deploy, hostname-based routing.
+Proposed in PR #10 (merged); this section is that plan with the mechanics corrected after an audit pass (PR #10's sketch was never build-tested and had two blockers as written). The goal stands: `contador.com.py` reads as a normal Paraguayan accounting *firm* (SEO-optimized, no SaaS framing) while the software lives at `sistema.contador.com.py` — one Next.js process, one deploy, hostname-based routing.
 
 1. **Hostname routing in `src/middleware.ts`** — replace the bare `export default withAuth(...)` with a middleware function that branches on host **and rewrites**:
    - App hosts (`sistema.contador.com.py`, staging/preview hosts) → today's `withAuth` behavior unchanged.
