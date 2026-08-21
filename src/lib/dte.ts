@@ -30,8 +30,10 @@ async function loadInvoice(invoiceId: string): Promise<InvoiceWithRelations> {
  * produces QR + KuDE, and queues the SIFEN send job.
  */
 export async function emitInvoice(invoiceId: string): Promise<InvoiceWithRelations> {
-  const { adapter, company, config } = await getSifenAdapterForCompany();
+  // The invoice decides which company's adapter and certificate are used —
+  // a job has no session to ask (PLAN Phase 6.4).
   let invoice = await loadInvoice(invoiceId);
+  const { adapter, company, config } = await getSifenAdapterForCompany(invoice.companyId);
   if (invoice.status !== "DRAFT" && invoice.status !== "REJECTED") {
     throw new Error(`Invoice ${invoiceId} is not a draft (status ${invoice.status})`);
   }
@@ -138,8 +140,8 @@ export async function emitInvoice(invoiceId: string): Promise<InvoiceWithRelatio
 
 /** Job handler: send the signed XML to SIFEN and process the verdict. */
 export async function sendInvoiceToSifen(invoiceId: string): Promise<void> {
-  const { adapter, company } = await getSifenAdapterForCompany();
   const invoice = await loadInvoice(invoiceId);
+  const { adapter, company } = await getSifenAdapterForCompany(invoice.companyId);
   if (!["QUEUED", "SENT", "CONTINGENCY"].includes(invoice.status)) return;
   if (!invoice.signedXmlPath) throw new Error("Invoice has no signed XML");
 
@@ -213,8 +215,8 @@ export async function sendInvoiceToSifen(invoiceId: string): Promise<void> {
 
 /** Job handler: poll SIFEN for the status of a sent document. */
 export async function queryInvoiceStatus(invoiceId: string): Promise<void> {
-  const { adapter, company } = await getSifenAdapterForCompany();
   const invoice = await loadInvoice(invoiceId);
+  const { adapter, company } = await getSifenAdapterForCompany(invoice.companyId);
   if (!invoice.cdc) return;
   const status = await adapter.queryStatus(invoice.cdc);
   await logSifen({
@@ -259,8 +261,8 @@ export function cancelWindowOpen(invoice: { approvedAt: Date | null; emittedAt: 
 
 /** Cancels an approved document in SIFEN (evento de cancelación). */
 export async function cancelInvoice(invoiceId: string, reason: string): Promise<void> {
-  const { adapter, company } = await getSifenAdapterForCompany();
   const invoice = await loadInvoice(invoiceId);
+  const { adapter, company } = await getSifenAdapterForCompany(invoice.companyId);
   if (invoice.status !== "APPROVED") throw new Error("Only approved documents can be cancelled");
   if (!invoice.cdc) throw new Error("Invoice has no CDC");
   if (!cancelWindowOpen(invoice)) {
@@ -288,8 +290,8 @@ export async function cancelInvoice(invoiceId: string, reason: string): Promise<
 
 /** Regenerates the KuDE PDF (e.g. after approval to refresh QR/status). */
 export async function regenerateKude(invoiceId: string): Promise<string> {
-  const { adapter, company } = await getSifenAdapterForCompany();
   const invoice = await loadInvoice(invoiceId);
+  const { adapter, company } = await getSifenAdapterForCompany(invoice.companyId);
   const base = `${invoice.tipoDocumento}-${invoice.fullNumber ?? invoice.id}`;
   const kudeBuffer = await generateKudePdf(invoice, company, invoice.qrText, adapter.mode);
   const kudePath = await saveFile("kude", `${base}.pdf`, kudeBuffer);

@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getCompanyId } from "@/lib/company";
 import { getSifenMode } from "@/lib/sifen";
 import { AppShell } from "@/components/app-shell";
 import { startJobRunner } from "@/lib/jobs/runner";
@@ -14,7 +15,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Boot the in-process job runner (no-op if already running).
   startJobRunner();
 
-  const company = await prisma.company.findFirst({ select: { razonSocial: true } });
+  const company = await prisma.company.findUnique({
+    where: { id: await getCompanyId() },
+    select: { razonSocial: true },
+  });
 
   return (
     <AppShell

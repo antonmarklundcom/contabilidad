@@ -10,6 +10,7 @@ import { MockSifenAdapter } from "./mock-adapter";
 import { RealSifenAdapter } from "./real-adapter";
 import { buildCompanyConfig } from "./mapping";
 import { prisma } from "@/lib/prisma";
+import { getCompanyId } from "@/lib/company";
 
 export function getSifenMode(): SifenMode {
   const mode = (process.env.SIFEN_MODE || "mock").toLowerCase();
@@ -22,13 +23,22 @@ export function createSifenAdapter(company: CompanyConfig, mode = getSifenMode()
   return new RealSifenAdapter(company, mode);
 }
 
-/** Loads the company + establishments and returns a ready adapter. */
-export async function getSifenAdapterForCompany(): Promise<{
+/**
+ * Loads the company + establishments and returns a ready adapter.
+ *
+ * `companyId` is explicit wherever the caller already knows it (the DTE
+ * lifecycle knows it from the invoice), because a background job has no
+ * session to resolve it from; omitting it falls back to `getCompanyId()`,
+ * which is the session in a request and the sole company otherwise.
+ */
+export async function getSifenAdapterForCompany(companyId?: string): Promise<{
   adapter: SifenAdapter;
   company: Company;
   config: CompanyConfig;
 }> {
-  const company = await prisma.company.findFirst({
+  const id = companyId ?? (await getCompanyId());
+  const company = await prisma.company.findUnique({
+    where: { id },
     include: { establishments: true },
   });
   if (!company) throw new Error("No company configured");

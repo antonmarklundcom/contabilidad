@@ -60,7 +60,11 @@ export class RealSifenAdapter implements SifenAdapter {
       return { certPath: envPath, password };
     }
 
-    const company = await prisma.company.findFirst();
+    // Scoped to this adapter's company: with more than one tenant, "the first
+    // company" would hand over the wrong certificate (PLAN Phase 6.4).
+    const company = this.company.companyId
+      ? await prisma.company.findUnique({ where: { id: this.company.companyId } })
+      : await prisma.company.findFirst();
     if (company?.certPath && company.certPasswordEnc) {
       const encrypted = await fs.promises.readFile(company.certPath);
       const runtimePath = path.join(storageDir("certs"), "runtime.p12");

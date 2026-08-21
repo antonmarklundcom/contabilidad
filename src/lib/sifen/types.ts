@@ -9,6 +9,8 @@ export type SifenMode = "mock" | "test" | "production";
 /** Static issuer data — maps 1:1 to the xmlgen `params` JSON. */
 export interface CompanyConfig {
   version: number; // Manual Técnico version, 150
+  /** Our own Company.id — the adapter needs it to load that tenant's cert. */
+  companyId?: string;
   ruc: string; // "80000000-5" (with DV)
   razonSocial: string;
   nombreFantasia?: string;
