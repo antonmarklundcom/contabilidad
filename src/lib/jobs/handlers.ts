@@ -1,6 +1,7 @@
 import { sendInvoiceToSifen, queryInvoiceStatus, cancelInvoice, regenerateKude } from "@/lib/dte";
 import { createBackup } from "@/lib/backup";
 import { sendReminderEmail, type ReminderKind } from "@/lib/notifications";
+import { sendCloseReport } from "@/lib/tax/monthly-report";
 
 export async function runJobHandler(
   type: string,
@@ -28,6 +29,13 @@ export async function runJobHandler(
         kind: String(payload.kind) as ReminderKind,
         dueDate: String(payload.dueDate),
         detail: String(payload.detail ?? ""),
+      });
+      return;
+    case "send_report":
+      await sendCloseReport({
+        companyId: String(payload.companyId),
+        year: Number(payload.year),
+        month: Number(payload.month),
       });
       return;
     default:

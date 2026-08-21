@@ -42,8 +42,8 @@ KuDE PDF is `src/lib/kude.ts` (pdfkit + `qrcode`). In mock mode it stamps a "SIN
 
 - `src/lib/jobs/queue.ts` — `enqueueJob()`, exponential backoff.
 - `src/lib/jobs/runner.ts` — `startJobRunner()` (in-process interval, started from the app-group layout) + `runPendingJobs()` (also called by `/api/cron`). Jobs are claimed with an atomic `updateMany` so the interval and cron never double-run one.
-- `src/lib/jobs/handlers.ts` — dispatch: `send_dte`, `query_status`, `generate_kude`, `cancel_dte`, `backup`, `filing_reminder`.
-- `/api/cron` — authenticated by `x-cron-secret`; also enqueues the nightly backup if due and scans for compliance reminders.
+- `src/lib/jobs/handlers.ts` — dispatch: `send_dte`, `query_status`, `generate_kude`, `cancel_dte`, `backup`, `filing_reminder`, `send_report`.
+- `/api/cron` — authenticated by `x-cron-secret`; also enqueues the nightly backup if due, scans for compliance reminders, and pre-computes the month-end F.120 draft (`tax/precompute.ts`).
 - `src/lib/notifications.ts` — filing/timbrado/certificate reminders. The threshold ladder is pure (`reminderThreshold`); "never twice" is the `NotificationLog` unique constraint, inserted *before* the job is queued so a unique violation means "already sent". No SMTP ⇒ nothing logged, nothing queued.
 
 ## Tax calendar & filings (`src/lib/tax/`)
@@ -51,6 +51,7 @@ KuDE PDF is `src/lib/kude.ts` (pdfkit + `qrcode`). In mock mode it stamps a "SIN
 - `calendar.ts` — SET's perpetual calendar: due dates keyed by the **last digit of the RUC** (excluding the DV). `PERPETUAL_CALENDAR` is a flat data table so a SET resolution change is a one-line edit — do not turn it back into arithmetic. Pure, no I/O. Non-working days roll **forward**; decree-declared asuetos are not perpetual and are passed in via `options.extraHolidays` rather than baked in. ⚠️ The digit→day table still needs verification against a primary DNIT document.
 - `filing.ts` — the `TaxFiling` record: `closePeriod`/`getPeriodClose`/`reopenPeriod` (re-exported from `form120.ts` for existing callers), the status transitions, and the archive query. **Snapshots are immutable**: reopening deletes the filing, it never edits one. Every mutation is scoped by `companyId` as well as `id` — never trust an id alone.
 - `deadline.ts` — the "next filing due" summary behind the deadline card.
+- `monthly-report.ts` — assembles the monthly close report (shared by `/api/export/tax-report` and the `send_report` job) and mails it. `precompute.ts` — the month-end `DRAFT` filing, so the draft is waiting at login. A DRAFT snapshot is a convenience copy, never a declared figure.
 
 ## Accounting
 

@@ -9,6 +9,7 @@ import { buildReconciliation } from "@/lib/reconcile";
 import { audit } from "@/lib/audit";
 import { markSubmitted, markPaid, setFilingNotes } from "@/lib/tax/filing";
 import { filingTransitionSchema, filingNotesSchema } from "@/lib/validators";
+import { enqueueJob } from "@/lib/jobs/queue";
 
 export async function saveSaldoAnterior(
   year: number,
@@ -51,7 +52,11 @@ export async function closePeriodAction(
     aPagar: snapshot.aPagar,
     saldoAFavor: snapshot.saldoAFavor,
   });
+  // Deliver the close report by email. Queued, not inline: a slow or missing
+  // SMTP host must never make closing a period fail.
+  await enqueueJob("send_report", { companyId, year, month });
   revalidatePath("/taxes");
+  revalidatePath("/taxes/historial");
   return { ok: true };
 }
 

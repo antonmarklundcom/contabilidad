@@ -161,6 +161,12 @@ export async function plannedReminders(
   return planned;
 }
 
+export interface ReminderScanOptions {
+  /** Restrict the scan to one company. Used by tests and by any future
+   *  per-tenant scheduling; the cron scans every company. */
+  companyId?: string;
+}
+
 export interface ReminderScanResult {
   enqueued: number;
   /** Set when the scan did nothing on purpose. */
@@ -168,23 +174,33 @@ export interface ReminderScanResult {
 }
 
 /**
- * Scans every company and queues the reminders that are due and not yet sent.
+ * Scans companies (all of them by default) and queues the reminders that are
+ * due and not yet sent.
  *
  * Called from `/api/cron`; safe to call as often as the cron fires, because
  * the NotificationLog insert is what decides whether a reminder is new.
  */
-export async function enqueueDueReminders(now: Date = new Date()): Promise<ReminderScanResult> {
+export async function enqueueDueReminders(
+  now: Date = new Date(),
+  options: ReminderScanOptions = {}
+): Promise<ReminderScanResult> {
   if (!smtpConfigured()) return { enqueued: 0, skipped: "no_smtp" };
 
-  const companies = await prisma.company.findMany({ select: { id: true } });
+  const companies = await prisma.company.findMany({
+    where: options.companyId ? { id: options.companyId } : {},
+    select: { id: true },
+  });
   let enqueued = 0;
 
   for (const { id: companyId } of companies) {
     const planned = await plannedReminders(companyId, now);
-    for (const reminder of planned) {
-      const recipients = await reminderRecipients(companyId);
-      if (recipients.length === 0) continue;
+    if (planned.length === 0) continue;
+    // Nobody to tell: don't mark anything as sent, so the reminder still goes
+    // out once an address exists.
+    const recipients = await reminderRecipients(companyId);
+    if (recipients.length === 0) continue;
 
+    for (const reminder of planned) {
       // Insert first: the unique constraint is the lock.
       let logId: string;
       try {

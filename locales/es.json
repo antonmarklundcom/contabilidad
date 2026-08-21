@@ -456,6 +456,7 @@
     },
     "closePeriod": "Cerrar período",
     "closeBlockedHint": "Resolvé los documentos pendientes antes de cerrar el período.",
+    "draftPrepared": "Borrador preparado automáticamente el {date} — revisalo y cerrá el período.",
     "closedBy": "Período cerrado por {user} el {date}",
     "reopen": "Reabrir",
     "filingLockedHint": "La declaración ya fue presentada a la DNIT: sus cifras quedan congeladas y no se pueden reabrir ni volver a cerrar.",
@@ -525,6 +526,10 @@
     "cert_expiry": {
       "subject": "{company} — tu certificado digital vence el {date}",
       "body": "Recordatorio: el certificado digital que usás para firmar los documentos electrónicos vence el {date}.\n\nRenovalo con tu prestador y subí el nuevo archivo .p12 en Configuración antes de esa fecha."
+    },
+    "close_report": {
+      "subject": "{company} — informe mensual del período {detail}",
+      "body": "Adjuntamos el informe mensual del período {detail}, cerrado y firmado por una persona responsable.\n\nIncluye el resumen de ventas y compras, la posición de IVA y los importes para cargar en el Formulario 120."
     },
     "footer": "Este es un aviso automático de FacturaPY. No respondas a este correo."
   }
