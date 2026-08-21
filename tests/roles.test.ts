@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, globSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
 import {
   ROLES,
   normalizeRole,
@@ -132,7 +133,18 @@ describe("route gating", () => {
  * that forgets the check fails here rather than in production.
  */
 describe("every mutating server action checks a capability", () => {
-  const actionFiles = globSync("src/app/**/actions.ts");
+  /** Every `actions.ts` under src/app, found by walking rather than globbing. */
+  function findActionFiles(dir: string): string[] {
+    const found: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) found.push(...findActionFiles(full));
+      else if (entry.name === "actions.ts") found.push(full);
+    }
+    return found;
+  }
+
+  const actionFiles = findActionFiles("src/app");
 
   /** Reads only; a capability check would be wrong, not missing. */
   const READ_ONLY = new Set([
