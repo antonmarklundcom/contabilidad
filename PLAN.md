@@ -6,9 +6,9 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 | F.120 draft, reconciliation, `/taxes`, close + sign-off | **Shipped** (`form120.ts`, `reconcile.ts`, `tax-report.ts`) |
-| 2 | Item-level deducibility | **Shipped** (`deductibility.ts`, `ExpenseItem`) |
-| 3 | Marangatú/e-Kuatia import & matching | **Shipped** (`marangatu-import.ts`, `/api/expenses/import`) |
+| 1 | F.120 draft, reconciliation, `/taxes`, close + sign-off | **Shipped** (`form120.ts`, `reconcile.ts`, `tax-report.ts`) — sequence-gap check not built, see Phase 1 note |
+| 2 | Item-level deducibility | **Shipped** (`deductibility.ts`, `ExpenseItem`) — AI suggests via OCR; rules table not built, see Phase 2 note |
+| 3 | Marangatú import & matching | **Shipped** (`marangatu-import.ts`, `/api/expenses/import`) — CSV/XLSX only; XML DE + CDC check open, see Phase 3 note |
 | 4 | Delivery & polish | Partial — `mailer.ts` exists, no report/reminder jobs |
 | 5 | Compliance calendar & filing archive | **Mostly shipped** — 5.1–5.5 done (PRs #7 #8 #9); 5.6–5.8 (reminder/expiry jobs, `send_report`, paste-a-CDC) still open |
 | 6 | Document vault & client portal roles | Planned |
@@ -56,6 +56,8 @@ The centerpiece of the competitor's demo is really a *report*: period sales/purc
 
 Shipped as `src/lib/form120.ts` + `src/lib/reconcile.ts` + `src/lib/tax-report.ts` + the `/taxes` route (period picker, casilla summary, discrepancy tables, "Cerrar período" with `closedBy`/`closedAt`). Note the file layout differs from the sketch below: these live directly in `src/lib/`, not `src/lib/tax/`. New tax modules follow the shipped layout.
 
+**Shipped-vs-sketch gaps in item 2:** `buildReconciliation()` covers unapproved invoices, `NEEDS_REVIEW` expenses (which subsumes the failed-local-validation bullet — validation failures leave an expense in `NEEDS_REVIEW`), and duplicate suspects. The **sequence-gap check over `DocumentSequence` ranges was never built** — it is the one reconciliation only an emitter can do (STRATEGY leans on it) and rolls forward as Phase 5.9. `reconcile.ts` also has no tests, despite being money-adjacent.
+
 ## Phase 2 — Deducibility engine (AI-suggested, human-decided) ✅ shipped
 
 Item-by-item deducibility is genuinely useful and a real pain point. Competitor claims AI decides; we make AI *suggest* and a human confirm — same pattern as our OCR review screen.
@@ -70,6 +72,8 @@ Item-by-item deducibility is genuinely useful and a real pain point. Competitor 
 
 Shipped as `src/lib/deductibility.ts` + the `ExpenseItem` model (per-line `deduciblePercent`, with an expense-level fallback when there are no items).
 
+**How the shipped mechanism differs from items 1–2 above:** `deductibility.ts` is pure math only (`computeDeducible`, `itemIva`) — there is **no deterministic rules table and no separate Anthropic call**. The AI suggestion instead rides the OCR extraction itself: `/api/expenses/upload` stores each item's `deducibilidadSugerida`/`motivoDeducibilidad` as `deduciblePercent`/`deducibleReason` with `aiSuggested: true`, and the review UI renders AI-suggested reductions amber until a human edits or confirms. There is no `PENDING` state (items default to 100% deductible) and no supplier-memory for deducibility decisions. The rules-first triage that STRATEGY's cost-mitigation row assumes does not exist yet — if expense volume makes OCR-time suggestion too coarse, build the rules table then.
+
 ## Phase 3 — External comprobante import & reconciliation ✅ shipped
 
 The competitor ingests "electrónicas y virtuales que están en Marangatú." We do the same without credentials:
@@ -78,7 +82,7 @@ The competitor ingests "electrónicas y virtuales que están en Marangatú." We 
 2. **CDC lookup**: a "paste CDC" flow that runs `queryStatus`/consulta through the existing SIFEN adapter to verify a received document is real and APPROVED before trusting it — a check the competitor doesn't show.
 3. Reconcile imported DEs against OCR-captured expenses (match on RUC + número + fecha + total, the existing duplicate-detection key) so a photographed invoice and its electronic twin merge instead of double-counting.
 
-Shipped as `src/lib/marangatu-import.ts` + `/api/expenses/import`. Item 2 (paste-a-CDC consulta) is **not** done — it rolls forward into Phase 5.
+Shipped as `src/lib/marangatu-import.ts` + `/api/expenses/import` — **but what shipped is a Marangatú comprobantes CSV/XLSX export importer, not the XML DE upload item 1 describes.** The parser does flexible header matching over Marangatú's spreadsheet exports; there is no e-Kuatia XML parsing, and no CDC validation (the spreadsheet export carries no CDC column). Matching (item 3) shipped as duplicate-*skip* on the (RUC, número, fecha, total) key — an imported electronic twin of a photographed invoice is skipped, not merged, so no double-counting but also no enrichment. Still open, rolled forward: XML DE upload with `cdc.ts` validation (→ a future phase, alongside 5.8), and item 2 (paste-a-CDC consulta → Phase 5.8). The parser has no golden-file tests yet, which STRATEGY's format-drift mitigation assumes.
 
 ## Phase 4 — Delivery & polish (partial)
 
@@ -93,13 +97,13 @@ None of the four are done. Items 1 and 3 are absorbed into Phase 5, which gives 
 
 Competitor B's two strongest portal screens — "next deadline, N days remaining" and "all filings, box by box, with the official PDF." Both are cheap for us because the numbers already exist; what's missing is a due date and a durable record.
 
-1. **`src/lib/tax/calendar.ts`** — ✅ **shipped**. SET's perpetual calendar: due date for a period keyed by the **last digit of the RUC**. Pure functions (`ivaDueDate`, `irpDueDate`, `daysUntil`, plus `nextIvaFiling`), table-as-data (`PERPETUAL_CALENDAR`) so a resolution change is a one-line edit. Weekend/holiday roll-forward with Easter-derived and fixed national holidays; decree-declared asuetos are a caller-supplied option because they are not perpetual. Fixtures per digit in `tests/tax-calendar.test.ts`. ⚠️ The digit→day table is corroborated across four sources but **not** verified against a primary DNIT document — the build environment blocks `dnit.gov.py`. Needs owner sign-off.
+1. **`src/lib/tax/calendar.ts`** — ✅ **shipped**. SET's perpetual calendar: due date for a period keyed by the **last digit of the RUC**. Pure functions (`ivaDueDate`, `irpDueDate`, `daysUntil`, plus `nextIvaFiling`), table-as-data (`PERPETUAL_CALENDAR`) so a resolution change is a one-line edit. Weekend/holiday roll-forward with Easter-derived and fixed national holidays; decree-declared asuetos are a caller-supplied option because they are not perpetual. Fixtures per digit in `tests/tax-calendar.test.ts`. ⚠️ The digit→day table is corroborated across four sources but **not** verified against a primary DNIT document — the build environment blocks `dnit.gov.py`. Needs owner sign-off. **This has become load-bearing since it shipped:** `TaxFiling.dueDate` is persisted from it and the deadline card displays it, so verify against the DNIT resolution *before the first production filing*, not "eventually".
 2. **`TaxFiling` model** — ✅ **shipped**. Replaces the `PeriodClose` JSON blob previously stashed in `Setting`. Fields: `companyId, type (IVA|IRP), year, month?, status (DRAFT|CLOSED|SUBMITTED|PAID), dueDate, snapshot Json, closedBy, closedAt, submittedAt, paidAt, officialPdfPath, notes`. `closePeriod()`/`getPeriodClose()`/`reopenPeriod()` live in `src/lib/tax/filing.ts` and are re-exported from `form120.ts`, so callers were untouched. Snapshot is immutable — reopening deletes the filing rather than editing it. The `20260804094717_tax_filing` migration **copies** the old `Setting` rows across and leaves them in place; the copy is idempotent (`ON CONFLICT DO NOTHING`) and proven by `tests/tax-filing-migration.test.ts`, which executes the shipped SQL itself. Known gap: Postgres treats NULLs as distinct, so the unique constraint does not dedupe annual (`month IS NULL`) filings — Phase 7 must address that before writing IRP rows.
 3. **Filing status transitions** — ✅ **shipped**. Mark submitted / mark paid server actions (zod-validated, `audit()`ed, company-scoped), plus an upload slot for the DNIT receipt PDF in a new `STORAGE_DIR/filings` bucket. Replacing a receipt writes a new file and repoints the filing; the previous one stays on disk.
 4. **`/taxes/historial`** — ✅ **shipped**. Filing list using the standard `list-controls` conventions (search, date range, status, pagination, CSV via `/api/export/filings`), each row drilling into `/taxes/historial/[id]`: the frozen snapshot's casilla table, the lifecycle timeline, the receipt PDF and a notes field.
 5. **Deadline card** — ✅ **shipped**. `src/components/deadline-card.tsx` on both the dashboard and `/taxes`: next filing, due date, days remaining, current status. An unsubmitted filing already past its due date outranks the upcoming one, since that is the more urgent thing to show. Renders nothing when the RUC cannot be parsed rather than showing a date we cannot stand behind.
 6. **Reminder + expiry jobs** — ⏳ **not started**. New `filing_reminder` job type in `jobs/handlers.ts`, enqueued from `/api/cron` when `calendar.ts` says a filing is due in N days (default 10/3/1) and the period isn't `SUBMITTED`. Same job covers **timbrado expiry** (`Company.timbradoFechaInicio`/fin) and **certificate expiry** (already read by `crypto.ts` via node-forge) at 60/30/7 days. Email through `mailer.ts`; no-op cleanly when SMTP is unconfigured.
-7. **Phase 4 items 1 & 3 land here**: ⏳ **not started**. `send_report` job emailing the monthly close PDF after `closePeriod()`.
+7. **Phase 4 items 1 & 3 land here**: ⏳ **not started**. `send_report` job emailing the monthly close PDF after `closePeriod()`. Also fold in STRATEGY's "zero minutes beats four": a cron job that, once a month ends, pre-computes the F.120 draft so it is *already waiting* when the user logs in — STRATEGY adopts this as a differentiator but no phase implemented it; this is its home.
 
 **Groundwork notes for 5.6/5.7** (from a scoping pass, not yet built):
 - `Company` has `timbradoFechaInicio` but **no `timbradoFechaFin`** — timbrado expiry alerting needs that column added (nullable) plus a migration.
@@ -107,6 +111,7 @@ Competitor B's two strongest portal screens — "next deadline, N days remaining
 - Deduplication ("never send the same reminder twice") wants a `NotificationLog` model keyed unique on `(companyId, kind, subject, threshold)`, where the sender inserts first and treats a unique violation as "already sent" — atomic, matching how the job runner claims jobs with `updateMany`.
 - `mailer.ts` already exposes `smtpConfigured()`; the jobs must no-op cleanly when it returns false.
 8. **Paste-a-CDC consulta** (carried from Phase 3.2) — verify a received document through the SIFEN adapter before trusting it.
+9. **Sequence-gap check in reconciliation** (carried from Phase 1.2) — scan `DocumentSequence` ranges vs. emitted invoice numbers for the period and surface gaps in `buildReconciliation()`. Small, pure, and it is the check STRATEGY's "we emit; they observe" pitch cites — it should exist before that pitch is used on a prospect.
 
 ## Phase 6 — Document vault & client portal roles
 
@@ -150,7 +155,7 @@ Also still refused, per STRATEGY: portal credential custody, auto-filing to Mara
 | 5 — Calendar + filing archive | nothing new | calendar module + 1 migration + 1 route + cron wiring |
 | 6 — Vault + roles | Phase 5 (filings feed the vault) | 1 model + 1 route + auth pass over every action |
 | 7 — IRP | Phases 2 and 5 | new math module + 1 route, sized like Phase 1 |
-| 8 — Intake channels | Phase 6 roles | link flow small; WhatsApp gated on Meta approval |
+| 8 — Intake channels | WhatsApp intake: Phase 6 roles (sender→company mapping); the one-time link is no-login by design and needs only the host-split decision (PR #10), not roles | link flow small; WhatsApp gated on Meta approval |
 
 Build order within Phase 5: calendar → `TaxFiling` migration → status actions → historial route → deadline card → reminder jobs. The calendar comes first because everything else displays its output.
 

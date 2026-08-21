@@ -81,7 +81,7 @@ KuDE PDF is `src/lib/kude.ts` (pdfkit + `qrcode`). In mock mode it stamps a "SIN
 
 ## Tests
 
-`tests/` (Vitest, `npm test`): RUC check digit vs the library, CDC format + library equality, IVA/totals math, and sequence increment under concurrency (skips gracefully if no DB). These protect money; keep them green.
+`tests/` (Vitest, `npm test`): RUC check digit vs the library, CDC format + library equality, IVA/totals math, sequence increment under concurrency (skips gracefully if no DB), F.120 casilla math (`form120.test.ts`), per-item deducibility math (`deductibility.test.ts`), perpetual-calendar due dates per RUC digit (`tax-calendar.test.ts`), and the TaxFiling migration's idempotence (`tax-filing-migration.test.ts`). These protect money; keep them green. Known holes: `reconcile.ts` and `marangatu-import.ts` have no tests (see ARCHITECTURE §Testing).
 
 ## Database changes
 
