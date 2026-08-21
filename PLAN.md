@@ -14,6 +14,7 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 | 6 | Document vault & client portal roles | Planned |
 | 7 | Annual IRP return | Planned |
 | 8 | Intake channels (WhatsApp, one-time invoice link) | Planned, gated |
+| 9 | Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split | Planned, next |
 
 ## Context — competitor A: the AI accountant
 
@@ -133,6 +134,21 @@ Lowering the friction of getting a receipt into the books. Both are real product
 1. **One-time invoice link** — signed, short-lived token route (`/e/[token]`) rendering a minimal emission form that calls `emitInvoice()`. No login, no install. Token is single-use, scoped to one company and one document type, `audit()`ed on redemption. Small and genuinely differentiating; build first.
 2. **WhatsApp receipt intake** — WhatsApp Business API webhook → media download → the existing `/api/expenses/upload` OCR pipeline → normal amber-confidence review. **Gate:** requires a Meta Business account, a verified number and per-conversation costs. Evaluate before committing. Until then the honest share flow (Phase 4.2) stands — do not simulate an inbound channel we don't have.
 
+## Phase 9 — Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split
+
+The owner holds `contador.com.py` (currently static HTML on a different Hostinger account) and wants it to read as a normal Paraguayan accounting *firm* — SEO-optimized, no SaaS/product framing — with the actual software living behind a subdomain. Same shape already proven on `clientes.com.py` / `crm.clientes.com.py`: one Node.js app, one deploy, hostname-based routing. Not a second codebase.
+
+1. **Hostname routing in `src/middleware.ts`.** Today's middleware (`withAuth`, matcher excludes `/login`, `/api/auth`, `/api/cron`, static assets) protects *everything else*. Split by `request.headers.get("host")`:
+   - `sistema.contador.com.py` (and any preview/staging host) → today's behavior unchanged, `withAuth` gate stays exactly as-is.
+   - `contador.com.py` / `www.contador.com.py` (the apex) → **no auth check**, routed to a new public route group; any accidental hit on an app path (`/invoices`, `/settings`, …) on the apex host 404s or redirects to the marketing home, it does not fall through to the software.
+   - Do this with an explicit host allowlist, not a "assume app unless marketing path matches" default — a misconfigured host must fail closed (marketing), never leak an app route unauthenticated.
+2. **New route group `src/app/(marketing)/`** — fully public, no session, no Prisma calls that assume a company (`getCompanyId()` must never be reached from here). Server Components, static/ISR where possible for Core Web Vitals. Pages: home, servicios (facturación electrónica, libros IVA, F.120, IRP — described as *services a firm performs*, not *features of a product*), sobre-nosotros, contacto (WhatsApp + form → existing `mailer.ts` or a lead table, no `Client`/`Company` coupling), and a blog/guides section if SEO strategy wants ongoing content. Spanish-first copy (voseo, matching `locales/es.json` conventions), separate from the app's i18n dictionaries since the audience and tone differ.
+3. **SEO baseline**: per-page `generateMetadata`, `sitemap.ts`, `robots.ts` scoped to the marketing group only (the app host should stay `noindex` — add `X-Robots-Tag: noindex` or a robots meta on every `(app)` response when host is `sistema.*`), JSON-LD `AccountingService`/`LocalBusiness` schema, OpenGraph images. Reuse `paraguay-business-apps`/`web-design-system` skill guidance for the actual page build when that starts — this phase only stages the plan.
+4. **DNS/hosting**: both `contador.com.py` (apex) and `sistema.contador.com.py` point at the *same* Node.js app on the new Hostinger Node.js hosting slot (migrating off the current static-HTML hosting for the apex). No new `$PORT`/env split — one process serves both hosts, matching `next.config.ts`'s existing `output: "standalone"` setup. Follow the `nextjs-deploy-hostinger` skill for the actual subdomain mapping steps when this is executed.
+5. **Ordering**: this can proceed in parallel with Phases 5–8 — it touches middleware and adds a new route group, no shared code with the tax/accounting modules. Sequence it before Phase 8's one-time-invoice-link (`/e/[token]`) and any future public-facing intake route, since those need the host-split decided first (is `/e/[token]` served on `sistema.*` only, or also the apex? — default: `sistema.*` only, keep the apex purely marketing).
+
+**Not in scope here:** rewriting the existing static HTML content — that's copy/design work for whoever builds `(marketing)/`, not an architecture decision. This phase is the routing/hosting seam only.
+
 ## Explicitly out of scope
 
 Competitor B's service lines — RUC registration in Marangatú, rented address + utility bills, rental contracts, physical mail reception/forwarding, tax residency certificate issuance, apostille and shipping. These are an operations business staffed by humans, not features. If we ever sell them, the software side is already covered: Phase 6's vault delivers the documents and Phase 5's job engine handles renewal reminders. Nothing further to build.
@@ -151,6 +167,7 @@ Also still refused, per STRATEGY: portal credential custody, auto-filing to Mara
 | 6 — Vault + roles | Phase 5 (filings feed the vault) | 1 model + 1 route + auth pass over every action |
 | 7 — IRP | Phases 2 and 5 | new math module + 1 route, sized like Phase 1 |
 | 8 — Intake channels | Phase 6 roles | link flow small; WhatsApp gated on Meta approval |
+| 9 — Marketing/app domain split | nothing new; sequence before 8's public link route | middleware host-split + new route group + DNS move, no shared code with tax/accounting |
 
 Build order within Phase 5: calendar → `TaxFiling` migration → status actions → historial route → deadline card → reminder jobs. The calendar comes first because everything else displays its output.
 
