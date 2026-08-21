@@ -450,6 +450,11 @@
     "reconciliationDirty": "There are unresolved documents — review them before closing the period.",
     "unresolvedInvoices": "Invoices not yet approved by SIFEN",
     "unresolvedExpenses": "Unconfirmed or duplicate expenses",
+    "sequenceGaps": "Document numbers with no document",
+    "sequenceGapsHint": "Numbers the sequence handed out with nothing to show for them. They do not block the close — a burned number cannot be recovered — but it is worth having the explanation ready for DNIT.",
+    "sequenceGapCount": "{count} number(s)",
+    "sequenceGapReserved": "Reserved, never issued",
+    "sequenceGapMissing": "Missing inside the range",
     "reason": {
       "NEEDS_REVIEW": "Needs review",
       "DUPLICATE_SUSPECT": "Possible duplicate"

@@ -450,6 +450,11 @@
     "reconciliationDirty": "Hay documentos sin resolver — revisalos antes de cerrar el período.",
     "unresolvedInvoices": "Facturas sin aprobar por SIFEN",
     "unresolvedExpenses": "Gastos sin confirmar o duplicados",
+    "sequenceGaps": "Números de documento sin comprobante",
+    "sequenceGapsHint": "Números que la numeración entregó y que no tienen documento emitido. No bloquean el cierre — un número quemado no se recupera —, pero conviene tener la explicación a mano ante la DNIT.",
+    "sequenceGapCount": "{count} número(s)",
+    "sequenceGapReserved": "Reservado sin emitir",
+    "sequenceGapMissing": "Faltante en el rango",
     "reason": {
       "NEEDS_REVIEW": "Para revisar",
       "DUPLICATE_SUSPECT": "Posible duplicado"

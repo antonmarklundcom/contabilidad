@@ -198,6 +198,33 @@ export default async function TaxesPage({
             </div>
           )}
 
+          {reconciliation.sequenceGaps.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">{t("taxes.sequenceGaps")}</h3>
+              <p className="text-xs text-muted-foreground">{t("taxes.sequenceGapsHint")}</p>
+              <div className="divide-y rounded-md border text-sm">
+                {reconciliation.sequenceGaps.map((gap) => (
+                  <div
+                    key={`${gap.establecimiento}-${gap.punto}-${gap.tipoDocumento}-${gap.from}`}
+                    className="flex items-center justify-between gap-2 px-3 py-2"
+                  >
+                    <span className="tabular-nums">
+                      {gap.establecimiento}-{gap.punto}-
+                      {String(gap.from).padStart(7, "0")}
+                      {gap.count > 1 ? ` → ${String(gap.to).padStart(7, "0")}` : ""}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {t("taxes.sequenceGapCount", { count: gap.count })}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {gap.trailing ? t("taxes.sequenceGapReserved") : t("taxes.sequenceGapMissing")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="border-t pt-4">
             {draftPreparedAt && (
               <p className="mb-3 text-xs text-muted-foreground">

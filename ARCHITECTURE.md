@@ -25,7 +25,7 @@ Next.js 15 App Router (standalone, single process)
 │   ├── dte.ts                 emit → send → cancel lifecycle
 │   ├── accounting.ts          libroVentas/libroCompras/dashboard/trend
 │   ├── form120.ts             period → F.120 casillas (pure math) + saldo anterior
-│   ├── reconcile.ts           period discrepancy checks (see Extension 1 status)
+│   ├── reconcile.ts           period discrepancy checks + sequence gaps
 │   ├── tax-report.ts          F.120 / monthly close PDFs (pdfkit)
 │   ├── deductibility.ts       per-item IVA + deducible totals (pure math)
 │   ├── marangatu-import.ts    Marangatú CSV/XLSX comprobante-export parser
@@ -61,7 +61,7 @@ Load-bearing invariants (do not weaken while extending):
 
 ## Extension 1 — Tax module (`src/lib/tax/`) — PLAN Phase 1–2
 
-> **Status: shipped, under different names.** This section is the pre-build sketch, kept for the rationale. As-built: the modules live directly in `src/lib/` — `form120.ts` (not `tax/f120.ts`), `reconcile.ts`, `tax-report.ts` (not `report-pdf.ts`), `deductibility.ts`; the route is `/taxes`, not `/reports/declaracion`; the `PeriodClose` model sketched below was first a `Setting` JSON blob and then replaced by the `TaxFiling` model (PLAN Phase 5.2); `Expense` gained an integer `deduciblePercent` + per-line `ExpenseItem` rows instead of the enum/confidence columns; PDFs are generated on demand (no `generate_close_report` job); and reconcile shipped **without** the sequence-gap check (PLAN Phase 5.9). Where this sketch and the code disagree, the code wins.
+> **Status: shipped, under different names.** This section is the pre-build sketch, kept for the rationale. As-built: the modules live directly in `src/lib/` — `form120.ts` (not `tax/f120.ts`), `reconcile.ts`, `tax-report.ts` (not `report-pdf.ts`), `deductibility.ts`; the route is `/taxes`, not `/reports/declaracion`; the `PeriodClose` model sketched below was first a `Setting` JSON blob and then replaced by the `TaxFiling` model (PLAN Phase 5.2); `Expense` gained an integer `deduciblePercent` + per-line `ExpenseItem` rows instead of the enum/confidence columns; PDFs are generated on demand (no `generate_close_report` job); and reconcile's sequence-gap check followed later (PLAN Phase 5.9). Where this sketch and the code disagree, the code wins.
 
 New sibling to `sifen/`, same "pure core, thin edges" shape:
 
@@ -138,7 +138,7 @@ Shipped: `tests/form120.test.ts` (casilla math), `tests/deductibility.test.ts` (
 Still missing, and worth building before the modules are touched again:
 
 - Golden-file tests for `marangatu-import.ts` — STRATEGY's format-drift mitigation assumes these exist; they don't.
-- Reconciliation golden-file tests (period fixture → expected findings list) — `reconcile.ts` currently has no tests at all.
+- Reconciliation golden-file tests (period fixture → expected findings list). The pure sequence-gap half is covered by `tests/reconcile-sequence.test.ts`; the DB-backed findings list still has none.
 - `tests/parse-de.test.ts` — sample DE XML → parsed DTO → CDC re-validation (when the XML lane is built).
 Also shipped: `tests/tax-precompute.test.ts` (period arithmetic, idempotence, never clobbering a declared filing), `tests/notifications.test.ts` (reminder threshold ladder, both-locale copy, DB dedup/no-SMTP/recipient roles) and `tests/tax-filing-guards.test.ts` — deny paths for the Phase 5.10 filing status guards (reopen/re-close of `SUBMITTED`/`PAID` refuse and leave the row intact).
 

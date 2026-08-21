@@ -6,11 +6,11 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 | F.120 draft, reconciliation, `/taxes`, close + sign-off | **Shipped** (`form120.ts`, `reconcile.ts`, `tax-report.ts`) — sequence-gap check not built, see Phase 1 note |
+| 1 | F.120 draft, reconciliation, `/taxes`, close + sign-off | **Shipped** (`form120.ts`, `reconcile.ts`, `tax-report.ts`); the sequence-gap check followed in 5.9 |
 | 2 | Item-level deducibility | **Shipped** (`deductibility.ts`, `ExpenseItem`) — AI suggests at OCR time; no rules table, see Phase 2 note |
 | 3 | Marangatú import & matching | **Shipped** (`marangatu-import.ts`, `/api/expenses/import`) — CSV/XLSX export only; XML DE + CDC check open, see Phase 3 note |
 | 4 | Delivery & polish | Partial — `mailer.ts` exists, no report/reminder jobs |
-| 5 | Compliance calendar & filing archive | **Mostly shipped** — 5.1–5.5 done (PRs #7 #8 #9); 5.6 (reminder/expiry jobs), 5.7 (`send_report` + pre-computed draft) and 5.10 (filing status guards) done; 5.8–5.9 (paste-a-CDC, sequence-gap check) still open |
+| 5 | Compliance calendar & filing archive | **Mostly shipped** — 5.1–5.5 done (PRs #7 #8 #9); 5.6 (reminder/expiry jobs), 5.7 (`send_report` + pre-computed draft), 5.9 (sequence-gap check) and 5.10 (filing status guards) done; 5.8 (paste-a-CDC) still open |
 | 6 | Document vault & client portal roles | Planned |
 | 7 | Annual IRP return | Planned |
 | 8 | Intake channels (WhatsApp, one-time invoice link) | Planned, gated |
@@ -57,7 +57,7 @@ The centerpiece of the competitor's demo is really a *report*: period sales/purc
 
 Shipped as `src/lib/form120.ts` + `src/lib/reconcile.ts` + `src/lib/tax-report.ts` + the `/taxes` route (period picker, casilla summary, discrepancy tables, "Cerrar período" with `closedBy`/`closedAt`). Note the file layout differs from the sketch below: these live directly in `src/lib/`, not `src/lib/tax/`. New tax modules follow the shipped layout.
 
-**Shipped-vs-sketch gaps in item 2:** `buildReconciliation()` covers unapproved invoices, `NEEDS_REVIEW` expenses (which subsumes the failed-local-validation bullet — a failed validation leaves the expense in `NEEDS_REVIEW`), and duplicate suspects. The **sequence-gap check over `DocumentSequence` ranges was never built** — it is the one reconciliation only an emitter can do (STRATEGY leans on it as pitch #1) and rolls forward as Phase 5.9. `reconcile.ts` also has no tests despite being money-adjacent.
+**Shipped-vs-sketch gaps in item 2:** `buildReconciliation()` covers unapproved invoices, `NEEDS_REVIEW` expenses (which subsumes the failed-local-validation bullet — a failed validation leaves the expense in `NEEDS_REVIEW`), and duplicate suspects. The **sequence-gap check over `DocumentSequence` ranges** shipped later, as Phase 5.9, with pure fixtures in `tests/reconcile-sequence.test.ts`; the DB-backed findings list is still untested.
 
 ## Phase 2 — Deducibility engine (AI-suggested, human-decided) ✅ shipped
 
@@ -110,7 +110,8 @@ Competitor B's two strongest portal screens — "next deadline, N days remaining
    - **Month-end pre-computation** (STRATEGY's "zero minutes beats four"): `src/lib/tax/precompute.ts`, run from `/api/cron`, writes a `DRAFT` `TaxFiling` with the just-ended period's figures so the draft is *already waiting* at login. Idempotent — an existing filing in any status is left untouched, and a concurrent runner loses to the unique constraint. A DRAFT snapshot is a convenience copy, not a declared figure: `getPeriodClose()` still ignores DRAFT rows and `closePeriod()` overwrites it with the figures as of sign-off. `/taxes` says when the draft was prepared.
 
 8. **Paste-a-CDC consulta** (carried from Phase 3.2) — verify a received document through the SIFEN adapter before trusting it.
-9. **Sequence-gap check in reconciliation** (carried from Phase 1.2) — scan `DocumentSequence` ranges vs. emitted invoice numbers for the period and surface gaps in `buildReconciliation()`. Small, pure, and it is the check STRATEGY's "we emit; they observe" pitch cites — build it before that pitch is used on a prospect.
+9. **Sequence-gap check in reconciliation** (carried from Phase 1.2) — ✅ **shipped**. `findSequenceGaps()` in `reconcile.ts` is pure and fixture-tested (`tests/reconcile-sequence.test.ts`); `buildReconciliation()` feeds it every numbered document plus the `DocumentSequence` counters. Two findings: a number missing *inside* the period's own range, and a trailing run the sequence reserved that no document ever claimed (the crash-between-increment-and-insert case), reported once — on the period holding the newest document. The window is the period's own numbers, so a company that started mid-sequence is not accused of a gap it never emitted, and membership is checked against the series' whole history, so a back-dated document elsewhere is not a false positive. A cancelled or rejected document still consumes its number and is therefore not a gap. Deliberately **not** part of `clean`: a burned number cannot be un-burned, so blocking the close on it would block it forever — it is a disclosure, shown on `/taxes` with that explanation, not a to-do.
+
 10. **Filing status guards** — ✅ **shipped**. Filing immutability is now enforced in the data layer, not only the UI. The rule lives in `src/lib/tax/filing-status.ts` (pure, client-safe, so the `/taxes` UI shares the exact predicate the server enforces): only `DRAFT`/`CLOSED` filings may be rewritten. `reopenPeriod()` carries the status filter inside its `deleteMany` (check and delete in one statement) and returns `{ ok: false, reason: "locked", status }` for a `SUBMITTED`/`PAID` filing; a period with no filing stays a no-op. `closePeriod()` likewise refuses to overwrite a declared snapshot, and its update path filters on status so a filing submitted between the read and the write is re-read rather than overwritten. Both refusals are `audit()`ed (`close_refused`/`reopen_refused`) and surfaced with a bilingual hint; the reopen button is not offered once the filing is declared. Deny paths covered by `tests/tax-filing-guards.test.ts` (pure predicates everywhere, DB deny paths when `DATABASE_URL` is reachable).
 
 ## Phase 6 — Document vault & client portal roles
