@@ -456,6 +456,7 @@
     },
     "closePeriod": "Close period",
     "closeBlockedHint": "Resolve the pending documents before closing the period.",
+    "draftPrepared": "Draft prepared automatically on {date} — review it and close the period.",
     "closedBy": "Period closed by {user} on {date}",
     "reopen": "Reopen",
     "filingLockedHint": "This filing was already submitted to DNIT: its figures are frozen and cannot be reopened or re-closed.",
@@ -525,6 +526,10 @@
     "cert_expiry": {
       "subject": "{company} — your digital certificate expires on {date}",
       "body": "Reminder: the digital certificate you use to sign electronic documents expires on {date}.\n\nRenew it with your provider and upload the new .p12 file in Settings before that date."
+    },
+    "close_report": {
+      "subject": "{company} — monthly report for period {detail}",
+      "body": "Attached is the monthly report for period {detail}, closed and signed off by a named person.\n\nIt covers the sales and purchase summary, the VAT position, and the figures to enter in Formulario 120."
     },
     "footer": "This is an automatic notice from FacturaPY. Please do not reply to this email."
   }

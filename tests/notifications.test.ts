@@ -147,7 +147,7 @@ describe.skipIf(!process.env.DATABASE_URL)("reminder scan (database)", () => {
     const previous = process.env.SMTP_HOST;
     delete process.env.SMTP_HOST;
     try {
-      const res = await enqueueDueReminders(new Date("2026-09-05T12:00:00Z"));
+      const res = await enqueueDueReminders(new Date("2026-09-05T12:00:00Z"), { companyId });
       expect(res).toEqual({ enqueued: 0, skipped: "no_smtp" });
       // Nothing marked as sent, so reminders start flowing once SMTP exists.
       expect(await prisma.notificationLog.count({ where: { companyId } })).toBe(0);
@@ -164,21 +164,21 @@ describe.skipIf(!process.env.DATABASE_URL)("reminder scan (database)", () => {
     process.env.SMTP_FROM = "no-reply@example.com";
     try {
       const now = new Date("2026-09-05T12:00:00Z");
-      const first = await enqueueDueReminders(now);
+      const first = await enqueueDueReminders(now, { companyId });
       expect(first.enqueued).toBe(3);
 
-      const second = await enqueueDueReminders(now);
+      const second = await enqueueDueReminders(now, { companyId });
       expect(second.enqueued).toBe(0);
 
       expect(await prisma.jobQueue.count({ where: { type: "filing_reminder" } })).toBe(3);
       expect(await prisma.notificationLog.count({ where: { companyId } })).toBe(3);
 
       // A later day inside the same threshold step is still the same reminder.
-      const sameStep = await enqueueDueReminders(new Date("2026-09-09T12:00:00Z"));
+      const sameStep = await enqueueDueReminders(new Date("2026-09-09T12:00:00Z"), { companyId });
       expect(sameStep.enqueued).toBe(0);
 
       // Crossing into the next step is a new reminder.
-      const nextStep = await enqueueDueReminders(new Date("2026-09-12T12:00:00Z"));
+      const nextStep = await enqueueDueReminders(new Date("2026-09-12T12:00:00Z"), { companyId });
       expect(nextStep.enqueued).toBe(1);
       const filingLogs = await prisma.notificationLog.findMany({
         where: { companyId, kind: "filing_due" },

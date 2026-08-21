@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCompanyId } from "@/lib/company";
 import { getT } from "@/lib/i18n-server";
 import { buildForm120, getPeriodClose } from "@/lib/form120";
+import { getFiling } from "@/lib/tax/filing";
 import { buildReconciliation } from "@/lib/reconcile";
 import { PageHeader } from "@/components/page-header";
 import { MonthPicker } from "@/components/month-picker";
@@ -30,11 +31,18 @@ export default async function TaxesPage({
   const year = Number(params.year) || now.getFullYear();
   const month = Number(params.month) || now.getMonth() + 1;
 
-  const [data, reconciliation, close] = await Promise.all([
+  const [data, reconciliation, close, filing] = await Promise.all([
     buildForm120(companyId, year, month),
     buildReconciliation(companyId, year, month),
     getPeriodClose(companyId, year, month),
+    getFiling(companyId, year, month),
   ]);
+
+  // A DRAFT row means the month-end cron already prepared this draft (PLAN
+  // 5.7). The figures on screen are still recomputed live — this only says
+  // the work was waiting.
+  const draftPreparedAt =
+    filing && filing.status === "DRAFT" ? filing.createdAt : null;
 
   const Row = ({ label, value, bold }: { label: string; value: number; bold?: boolean }) => (
     <div className={`flex justify-between py-1 text-sm ${bold ? "font-semibold" : ""}`}>
@@ -191,6 +199,13 @@ export default async function TaxesPage({
           )}
 
           <div className="border-t pt-4">
+            {draftPreparedAt && (
+              <p className="mb-3 text-xs text-muted-foreground">
+                {t("taxes.draftPrepared", {
+                  date: draftPreparedAt.toISOString().slice(0, 10),
+                })}
+              </p>
+            )}
             <ClosePeriodForm
               year={year}
               month={month}
