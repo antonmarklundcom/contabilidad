@@ -97,6 +97,43 @@ No Marangatú credentials, ever: import is user-initiated file upload; verificat
 - Cron: `/api/cron` already runs due jobs; add a due-date check that enqueues a reminder based on SET's perpetual calendar (RUC last digit → due day), stored as data in `tax/calendar.ts`.
 - WhatsApp stays share-intent (honest manual attach) until/unless WhatsApp Business API is adopted; that would be a new `src/lib/whatsapp.ts` behind its own interface, mockable like the SIFEN adapter.
 
+## Extension 4 — Marketing/app domain split (PLAN Phase 9)
+
+`contador.com.py` (marketing, SEO, "we are an accounting firm") and `sistema.contador.com.py` (this app, unchanged) served from the **same** Next.js process — no second codebase, no second deploy. The seam is `src/middleware.ts`, which currently gates everything except `/login`, `/api/auth`, `/api/cron`, and static assets behind `withAuth`.
+
+```
+src/middleware.ts
+   host = request.headers.get("host")
+   host in APP_HOSTS (sistema.contador.com.py, staging/preview hosts)
+       → today's matcher + withAuth, unchanged
+   host in MARKETING_HOSTS (contador.com.py, www.contador.com.py)
+       → no auth; route to src/app/(marketing)/*
+       → any (app) path hit on this host: 404 / redirect to marketing home,
+         never fall through to an app route unauthenticated
+   host matches neither (misconfigured DNS, unexpected Host header)
+       → fail closed to marketing, never to the app
+```
+
+```
+src/app/(marketing)/          new, public, no session
+├── page.tsx                  home — firm framing, not product framing
+├── servicios/                facturación electrónica, libros IVA, F.120, IRP
+│                              described as services performed, not features
+├── sobre-nosotros/
+├── contacto/                 WhatsApp + form; does NOT touch getCompanyId()
+│                              or any (app) Prisma model — a lead capture at
+│                              most, never a Client/Company row
+├── sitemap.ts / robots.ts    scoped to this group only
+└── (blog/ if the SEO plan wants ongoing content)
+```
+
+Invariants this extension must not violate:
+- `getCompanyId()` (the multi-tenant seam, see CLAUDE.md) is never reachable from `(marketing)` — there is no company context on the apex host.
+- The app host stays `noindex` (`X-Robots-Tag` or robots meta on every `(app)` response when `host` is `sistema.*`) so the SEO investment lands only on the marketing host.
+- One `next.config.ts`, one `output: "standalone"` process, one `$PORT` — both hosts point DNS at the same Hostinger Node.js deployment. No env/config fork per host.
+
+Sequencing: independent of Phases 1–8 (touches only middleware + a new route group), but decide it *before* Phase 8's `/e/[token]` one-time invoice link — that route's host (app-only vs. also apex) depends on this split already existing. Default: `sistema.*` only.
+
 ## What deliberately does NOT get built
 
 - **No Marangatú portal automation** (login, scraping, headless filing). Off-architecture: it would require storing SET credentials, breaks on every portal change, and sits outside the official-API-only boundary that `sifen/` enforces.
