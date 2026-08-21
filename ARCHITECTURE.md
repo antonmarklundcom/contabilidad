@@ -32,6 +32,7 @@ Next.js 15 App Router (standalone, single process)
 │   ├── marangatu-import.ts    Marangatú CSV/XLSX comprobante-export parser
 │   ├── notifications.ts       reminder ladder + NotificationLog dedup
 │   ├── documents.ts           document vault (upload rules, company-scoped)
+│   ├── roles.ts / authz.ts    pure capability table + session-side check
 │   ├── tax/                   calendar.ts (perpetual due dates), filing.ts
 │   │                          (TaxFiling lifecycle), filing-status.ts (pure
 │   │                          immutability guards), deadline.ts (next-due
@@ -59,6 +60,7 @@ Load-bearing invariants (do not weaken while extending):
 3. **Money is deterministic**: PYG integers end-to-end; IVA extracted from IVA-included prices; covered by tests.
 4. **Sequential numbers are race-safe** (atomic increment) and gaps are detectable.
 5. **Every company-scoped query filters by `companyId`** via `getCompanyId()` — the multi-tenant seam.
+5b. **Every mutating server action checks a capability** via `allowed()` — the route gate in `middleware.ts` is a convenience, not the boundary, because a server action is a POST endpoint any session can call. A structural test in `tests/roles.test.ts` fails if a new action forgets.
 6. **Tax artifacts are write-once** on disk; mutations audit(). The DB side is enforced too since PLAN Phase 5.10: `closePeriod`/`reopenPeriod` refuse to rewrite or withdraw a `SUBMITTED`/`PAID` filing, guarded atomically in the write statement itself (`tax/filing.ts`, rule in `tax/filing-status.ts`).
 
 ## Extension 1 — Tax module (`src/lib/tax/`) — PLAN Phase 1–2
@@ -141,6 +143,6 @@ Also shipped: `tests/marangatu-import.test.ts` (golden fixtures under `tests/fix
 
 Still missing, and worth building before the modules are touched again:
 - `tests/parse-de.test.ts` — sample DE XML → parsed DTO → CDC re-validation (when the XML lane is built).
-Also shipped: `tests/documents.test.ts` (vault upload rules + cross-company deny paths), `tests/tax-precompute.test.ts` (period arithmetic, idempotence, never clobbering a declared filing), `tests/notifications.test.ts` (reminder threshold ladder, both-locale copy, DB dedup/no-SMTP/recipient roles) and `tests/tax-filing-guards.test.ts` — deny paths for the Phase 5.10 filing status guards (reopen/re-close of `SUBMITTED`/`PAID` refuse and leave the row intact).
+Also shipped: `tests/roles.test.ts` (per-role and per-route deny paths + the structural action guard), `tests/documents.test.ts` (vault upload rules + cross-company deny paths), `tests/tax-precompute.test.ts` (period arithmetic, idempotence, never clobbering a declared filing), `tests/notifications.test.ts` (reminder threshold ladder, both-locale copy, DB dedup/no-SMTP/recipient roles) and `tests/tax-filing-guards.test.ts` — deny paths for the Phase 5.10 filing status guards (reopen/re-close of `SUBMITTED`/`PAID` refuse and leave the row intact).
 
 All follow the existing Vitest setup and the "skips gracefully if no DB" pattern where DB-bound.

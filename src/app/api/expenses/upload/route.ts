@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCompanyId } from "@/lib/company";
+import { allowed } from "@/lib/authz";
 import { saveFile } from "@/lib/storage";
 import { extractReceipt, anthropicConfigured } from "@/lib/ocr";
 import { categoryForSupplier } from "@/app/(app)/expenses/actions";
@@ -21,6 +22,9 @@ const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/gif", "applicat
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await allowed("expenses:write"))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
   const companyId = await getCompanyId();
 
   const form = await req.formData();

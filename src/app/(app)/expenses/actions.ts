@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getCompanyId } from "@/lib/company";
 import { expenseSchema, type ExpenseInput } from "@/lib/validators";
 import { audit } from "@/lib/audit";
+import { allowed } from "@/lib/authz";
 
 /** Duplicate = same supplier + número + fecha + total. */
 async function findDuplicate(
@@ -42,6 +43,7 @@ export async function saveExpense(
   | { ok: true; id: string; duplicateOfId: string | null }
   | { ok: false; errors: Record<string, string> }
 > {
+  if (!(await allowed("expenses:write"))) return { ok: false, errors: { form: "forbidden" } };
   const parsed = expenseSchema.safeParse(input);
   if (!parsed.success) {
     const errors: Record<string, string> = {};
@@ -134,6 +136,7 @@ export async function saveExpense(
 }
 
 export async function deleteExpense(id: string): Promise<{ ok: boolean }> {
+  if (!(await allowed("expenses:write"))) return { ok: false };
   const companyId = await getCompanyId();
   await prisma.expense.deleteMany({ where: { id, companyId } });
   await audit("delete", "expense", id);
@@ -154,6 +157,7 @@ export async function categoryForSupplier(supplierRuc: string): Promise<string |
 export async function importMarangatuRows(
   rows: import("@/lib/marangatu-import").MarangatuRow[]
 ): Promise<{ created: number; skipped: number }> {
+  if (!(await allowed("expenses:write"))) return { created: 0, skipped: 0 };
   const companyId = await getCompanyId();
   let created = 0;
   let skipped = 0;

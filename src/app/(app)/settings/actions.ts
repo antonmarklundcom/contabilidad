@@ -9,6 +9,7 @@ import { ensureSequence } from "@/lib/sequences";
 import { testSmtp } from "@/lib/mailer";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { allowed } from "@/lib/authz";
 
 export type Result = { ok: true } | { ok: false; error: string };
 
@@ -34,6 +35,7 @@ export async function saveCompany(input: {
   email: string;
   actividades: { codigo: string; descripcion: string }[];
 }): Promise<Result> {
+  if (!(await allowed("settings:write"))) return { ok: false, error: "forbidden" };
   const companyId = await getCompanyId();
   if (!/^[0-9]{1,8}$/.test(input.ruc) || !/^[0-9]$/.test(input.dv)) {
     return { ok: false, error: "invalid_ruc" };
@@ -74,6 +76,7 @@ export async function addExpeditionPoint(
   establishmentCodigo: string,
   puntoCodigo: string
 ): Promise<Result> {
+  if (!(await allowed("settings:write"))) return { ok: false, error: "forbidden" };
   const companyId = await getCompanyId();
   if (!/^[0-9]{3}$/.test(establishmentCodigo) || !/^[0-9]{3}$/.test(puntoCodigo)) {
     return { ok: false, error: "invalid_code" };
@@ -98,6 +101,7 @@ export async function setSequenceNumber(
   sequenceId: string,
   currentNumber: number
 ): Promise<Result> {
+  if (!(await allowed("settings:write"))) return { ok: false, error: "forbidden" };
   const companyId = await getCompanyId();
   if (currentNumber < 0 || currentNumber > 9_999_999) {
     return { ok: false, error: "out_of_range" };
@@ -112,6 +116,7 @@ export async function setSequenceNumber(
 }
 
 export async function testSmtpAction(): Promise<Result> {
+  if (!(await allowed("settings:write"))) return { ok: false, error: "forbidden" };
   try {
     await testSmtp();
     return { ok: true };

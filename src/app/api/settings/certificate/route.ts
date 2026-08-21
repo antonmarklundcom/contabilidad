@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import forge from "node-forge";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { allowed } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { getCompanyId } from "@/lib/company";
 import { encrypt } from "@/lib/crypto";
@@ -16,6 +17,9 @@ import { audit } from "@/lib/audit";
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await allowed("settings:write"))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
   const companyId = await getCompanyId();
 
   const form = await req.formData();

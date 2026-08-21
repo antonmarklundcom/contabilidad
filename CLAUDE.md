@@ -11,7 +11,8 @@ Paraguayan electronic invoicing (SIFEN / DNIT DTE) + automatic accounting, as a 
 - **Next.js 15 App Router + TypeScript**, `output: "standalone"` (Hostinger Node host, port from `$PORT`).
 - **Prisma + PostgreSQL** (schema is MySQL-compatible — only shared features used). Client singleton in `src/lib/prisma.ts`.
 - **Tailwind v4 + hand-written shadcn-style components** in `src/components/ui/` (Radix primitives; no shadcn CLI was used — the registry host is blocked, components were written directly).
-- **NextAuth v4** credentials provider (`src/lib/auth.ts`), JWT sessions, bcrypt. `src/middleware.ts` protects everything except `/login`, `/api/auth`, `/api/cron`.
+- **NextAuth v4** credentials provider (`src/lib/auth.ts`), JWT sessions, bcrypt. `src/middleware.ts` protects everything except `/login`, `/api/auth`, `/api/cron`, and additionally gates paths by role.
+- **Roles**: `src/lib/roles.ts` is the pure capability table (`admin` / `accountant` / `client`; unknown normalises to `client`). Every mutating server action and write API route calls `allowed(capability)` from `src/lib/authz.ts` — the middleware gate is convenience, the action check is the boundary. A structural test fails if a new action forgets.
 - **No Redis / no Docker.** Background work is a DB-backed queue (`JobQueue` table) + an in-process runner + a cron endpoint.
 
 ## The SIFEN adapter — the core architectural boundary
