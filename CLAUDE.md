@@ -55,6 +55,8 @@ KuDE PDF is `src/lib/kude.ts` (pdfkit + `qrcode`). In mock mode it stamps a "SIN
 
 `src/lib/accounting.ts` — `libroVentas` (approved invoices), `libroCompras` (confirmed expenses), `dashboardData` (income/expense + IVA débito/crédito position), `monthlyTrend`. Libros export CSV/XLSX via `/api/export/libro`.
 
+Tax modules live directly in `src/lib/` (not `src/lib/tax/` — see ARCHITECTURE Extension 1 status note): `form120.ts` (casilla math + saldo anterior), `reconcile.ts` (period discrepancies; no sequence-gap check yet), `tax-report.ts` (F.120/close PDFs), `deductibility.ts` (per-item IVA math — pure functions; the AI suggestion happens at OCR time, there is no rules table), `marangatu-import.ts` (CSV/XLSX comprobante-export parser). The `/taxes` route owns the close flow. ⚠️ `reopenPeriod`/`closePeriod` currently lack status guards (PLAN Phase 5.10) — do not rely on the DB to refuse rewriting a `SUBMITTED`/`PAID` filing.
+
 ## OCR
 
 `src/lib/ocr.ts` — Anthropic vision (`claude-sonnet-4-6`, override with `OCR_MODEL`) + `messages.parse()` with a zod schema and per-field confidence. **Validation is always local** (`validateExtraction`): RUC check digit, totals math, date sanity — never trust the model's arithmetic. Upload route: `/api/expenses/upload`. Low-confidence fields render amber in the review screen. Duplicate detection on (supplierRuc, número, fecha, total). Supplier→category memory in `SupplierCategoryMap`.
@@ -81,7 +83,7 @@ KuDE PDF is `src/lib/kude.ts` (pdfkit + `qrcode`). In mock mode it stamps a "SIN
 
 ## Tests
 
-`tests/` (Vitest, `npm test`): RUC check digit vs the library, CDC format + library equality, IVA/totals math, and sequence increment under concurrency (skips gracefully if no DB). These protect money; keep them green.
+`tests/` (Vitest, `npm test`): RUC check digit vs the library, CDC format + library equality, IVA/totals math, sequence increment under concurrency (skips gracefully if no DB), F.120 casilla math (`form120.test.ts`), per-item deducibility math (`deductibility.test.ts`), perpetual-calendar due dates per RUC digit (`tax-calendar.test.ts`), and TaxFiling migration idempotence (`tax-filing-migration.test.ts`). These protect money; keep them green. Known holes: `reconcile.ts` and `marangatu-import.ts` have no tests (see ARCHITECTURE §Testing).
 
 ## Database changes
 

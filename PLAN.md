@@ -6,15 +6,15 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1 | F.120 draft, reconciliation, `/taxes`, close + sign-off | **Shipped** (`form120.ts`, `reconcile.ts`, `tax-report.ts`) |
-| 2 | Item-level deducibility | **Shipped** (`deductibility.ts`, `ExpenseItem`) |
-| 3 | Marangatú/e-Kuatia import & matching | **Shipped** (`marangatu-import.ts`, `/api/expenses/import`) |
+| 1 | F.120 draft, reconciliation, `/taxes`, close + sign-off | **Shipped** (`form120.ts`, `reconcile.ts`, `tax-report.ts`) — sequence-gap check not built, see Phase 1 note |
+| 2 | Item-level deducibility | **Shipped** (`deductibility.ts`, `ExpenseItem`) — AI suggests at OCR time; no rules table, see Phase 2 note |
+| 3 | Marangatú import & matching | **Shipped** (`marangatu-import.ts`, `/api/expenses/import`) — CSV/XLSX export only; XML DE + CDC check open, see Phase 3 note |
 | 4 | Delivery & polish | Partial — `mailer.ts` exists, no report/reminder jobs |
-| 5 | Compliance calendar & filing archive | **Mostly shipped** — 5.1–5.5 done (PRs #7 #8 #9); 5.6–5.8 (reminder/expiry jobs, `send_report`, paste-a-CDC) still open |
+| 5 | Compliance calendar & filing archive | **Mostly shipped** — 5.1–5.5 done (PRs #7 #8 #9); 5.6–5.10 (reminder/expiry jobs, `send_report`, paste-a-CDC, sequence-gap check, filing status guards) still open |
 | 6 | Document vault & client portal roles | Planned |
 | 7 | Annual IRP return | Planned |
 | 8 | Intake channels (WhatsApp, one-time invoice link) | Planned, gated |
-| 9 | Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split | Planned, next |
+| 9 | Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split | Planned, next (proposed in PR #10, merged; mechanics corrected below) |
 
 ## Context — competitor A: the AI accountant
 
@@ -57,6 +57,8 @@ The centerpiece of the competitor's demo is really a *report*: period sales/purc
 
 Shipped as `src/lib/form120.ts` + `src/lib/reconcile.ts` + `src/lib/tax-report.ts` + the `/taxes` route (period picker, casilla summary, discrepancy tables, "Cerrar período" with `closedBy`/`closedAt`). Note the file layout differs from the sketch below: these live directly in `src/lib/`, not `src/lib/tax/`. New tax modules follow the shipped layout.
 
+**Shipped-vs-sketch gaps in item 2:** `buildReconciliation()` covers unapproved invoices, `NEEDS_REVIEW` expenses (which subsumes the failed-local-validation bullet — a failed validation leaves the expense in `NEEDS_REVIEW`), and duplicate suspects. The **sequence-gap check over `DocumentSequence` ranges was never built** — it is the one reconciliation only an emitter can do (STRATEGY leans on it as pitch #1) and rolls forward as Phase 5.9. `reconcile.ts` also has no tests despite being money-adjacent.
+
 ## Phase 2 — Deducibility engine (AI-suggested, human-decided) ✅ shipped
 
 Item-by-item deducibility is genuinely useful and a real pain point. Competitor claims AI decides; we make AI *suggest* and a human confirm — same pattern as our OCR review screen.
@@ -71,6 +73,8 @@ Item-by-item deducibility is genuinely useful and a real pain point. Competitor 
 
 Shipped as `src/lib/deductibility.ts` + the `ExpenseItem` model (per-line `deduciblePercent`, with an expense-level fallback when there are no items).
 
+**How the shipped mechanism differs from items 1–2 above:** `deductibility.ts` is pure math only (`computeDeducible`, `itemIva`) — there is **no deterministic rules table and no separate Anthropic call**. The AI suggestion rides the OCR extraction itself: `/api/expenses/upload` stores each item's `deducibilidadSugerida`/`motivoDeducibilidad` as `deduciblePercent`/`deducibleReason` with `aiSuggested: true`, and the review UI renders AI-suggested reductions amber until a human edits or confirms. There is no `PENDING` state (items default to 100% deductible) and no supplier-memory for deducibility decisions. The rules-first triage STRATEGY's cost-mitigation row assumed does not exist — if expense volume makes OCR-time suggestion too coarse or costly, build the rules table then.
+
 ## Phase 3 — External comprobante import & reconciliation ✅ shipped
 
 The competitor ingests "electrónicas y virtuales que están en Marangatú." We do the same without credentials:
@@ -79,7 +83,7 @@ The competitor ingests "electrónicas y virtuales que están en Marangatú." We 
 2. **CDC lookup**: a "paste CDC" flow that runs `queryStatus`/consulta through the existing SIFEN adapter to verify a received document is real and APPROVED before trusting it — a check the competitor doesn't show.
 3. Reconcile imported DEs against OCR-captured expenses (match on RUC + número + fecha + total, the existing duplicate-detection key) so a photographed invoice and its electronic twin merge instead of double-counting.
 
-Shipped as `src/lib/marangatu-import.ts` + `/api/expenses/import`. Item 2 (paste-a-CDC consulta) is **not** done — it rolls forward into Phase 5.
+Shipped as `src/lib/marangatu-import.ts` + `/api/expenses/import` — **but what shipped is a Marangatú "consulta de comprobantes" CSV/XLSX export importer, not the XML DE upload item 1 describes.** The parser does flexible (case/accent-insensitive) header matching over Marangatú's spreadsheet exports; there is no e-Kuatia XML parsing and no CDC validation (the spreadsheet export carries no CDC column). Matching (item 3) shipped as duplicate-*skip* on the (RUC, número, fecha, total) key — an imported electronic twin of a photographed invoice is skipped, not merged, so no double-counting but also no enrichment. Still open, rolled forward: XML DE upload with `cdc.ts` validation, and item 2 (paste-a-CDC consulta → Phase 5.8). The parser has no golden-file tests, which STRATEGY's format-drift mitigation row assumes exist.
 
 ## Phase 4 — Delivery & polish (partial)
 
@@ -94,13 +98,13 @@ None of the four are done. Items 1 and 3 are absorbed into Phase 5, which gives 
 
 Competitor B's two strongest portal screens — "next deadline, N days remaining" and "all filings, box by box, with the official PDF." Both are cheap for us because the numbers already exist; what's missing is a due date and a durable record.
 
-1. **`src/lib/tax/calendar.ts`** — ✅ **shipped**. SET's perpetual calendar: due date for a period keyed by the **last digit of the RUC**. Pure functions (`ivaDueDate`, `irpDueDate`, `daysUntil`, plus `nextIvaFiling`), table-as-data (`PERPETUAL_CALENDAR`) so a resolution change is a one-line edit. Weekend/holiday roll-forward with Easter-derived and fixed national holidays; decree-declared asuetos are a caller-supplied option because they are not perpetual. Fixtures per digit in `tests/tax-calendar.test.ts`. ⚠️ The digit→day table is corroborated across four sources but **not** verified against a primary DNIT document — the build environment blocks `dnit.gov.py`. Needs owner sign-off.
+1. **`src/lib/tax/calendar.ts`** — ✅ **shipped**. SET's perpetual calendar: due date for a period keyed by the **last digit of the RUC**. Pure functions (`ivaDueDate`, `irpDueDate`, `daysUntil`, plus `nextIvaFiling`), table-as-data (`PERPETUAL_CALENDAR`) so a resolution change is a one-line edit. Weekend/holiday roll-forward with Easter-derived and fixed national holidays; decree-declared asuetos are a caller-supplied option because they are not perpetual. Fixtures per digit in `tests/tax-calendar.test.ts`. ⚠️ The digit→day table (0→7 … 9→25, matching the shape of Resolución General 38/2020) is corroborated across four sources but **not** verified against a primary DNIT document — the build environment blocks `dnit.gov.py`. **This has become load-bearing since it shipped:** `TaxFiling.dueDate` is persisted from it and the deadline card displays it, so it needs owner verification against the DNIT resolution *before the first production filing*, not "eventually".
 2. **`TaxFiling` model** — ✅ **shipped**. Replaces the `PeriodClose` JSON blob previously stashed in `Setting`. Fields: `companyId, type (IVA|IRP), year, month?, status (DRAFT|CLOSED|SUBMITTED|PAID), dueDate, snapshot Json, closedBy, closedAt, submittedAt, paidAt, officialPdfPath, notes`. `closePeriod()`/`getPeriodClose()`/`reopenPeriod()` live in `src/lib/tax/filing.ts` and are re-exported from `form120.ts`, so callers were untouched. Snapshot is immutable — reopening deletes the filing rather than editing it. The `20260804094717_tax_filing` migration **copies** the old `Setting` rows across and leaves them in place; the copy is idempotent (`ON CONFLICT DO NOTHING`) and proven by `tests/tax-filing-migration.test.ts`, which executes the shipped SQL itself. Known gap: Postgres treats NULLs as distinct, so the unique constraint does not dedupe annual (`month IS NULL`) filings — Phase 7 must address that before writing IRP rows.
 3. **Filing status transitions** — ✅ **shipped**. Mark submitted / mark paid server actions (zod-validated, `audit()`ed, company-scoped), plus an upload slot for the DNIT receipt PDF in a new `STORAGE_DIR/filings` bucket. Replacing a receipt writes a new file and repoints the filing; the previous one stays on disk.
 4. **`/taxes/historial`** — ✅ **shipped**. Filing list using the standard `list-controls` conventions (search, date range, status, pagination, CSV via `/api/export/filings`), each row drilling into `/taxes/historial/[id]`: the frozen snapshot's casilla table, the lifecycle timeline, the receipt PDF and a notes field.
 5. **Deadline card** — ✅ **shipped**. `src/components/deadline-card.tsx` on both the dashboard and `/taxes`: next filing, due date, days remaining, current status. An unsubmitted filing already past its due date outranks the upcoming one, since that is the more urgent thing to show. Renders nothing when the RUC cannot be parsed rather than showing a date we cannot stand behind.
 6. **Reminder + expiry jobs** — ⏳ **not started**. New `filing_reminder` job type in `jobs/handlers.ts`, enqueued from `/api/cron` when `calendar.ts` says a filing is due in N days (default 10/3/1) and the period isn't `SUBMITTED`. Same job covers **timbrado expiry** (`Company.timbradoFechaInicio`/fin) and **certificate expiry** (already read by `crypto.ts` via node-forge) at 60/30/7 days. Email through `mailer.ts`; no-op cleanly when SMTP is unconfigured.
-7. **Phase 4 items 1 & 3 land here**: ⏳ **not started**. `send_report` job emailing the monthly close PDF after `closePeriod()`.
+7. **Phase 4 items 1 & 3 land here**: ⏳ **not started**. `send_report` job emailing the monthly close PDF after `closePeriod()`. Also fold in STRATEGY's "zero minutes beats four": a cron job that pre-computes the F.120 draft once a month ends, so it is *already waiting* when the user logs in — STRATEGY adopts this as a differentiator but no phase implemented it; this is its home.
 
 **Groundwork notes for 5.6/5.7** (from a scoping pass, not yet built):
 - `Company` has `timbradoFechaInicio` but **no `timbradoFechaFin`** — timbrado expiry alerting needs that column added (nullable) plus a migration.
@@ -108,6 +112,8 @@ Competitor B's two strongest portal screens — "next deadline, N days remaining
 - Deduplication ("never send the same reminder twice") wants a `NotificationLog` model keyed unique on `(companyId, kind, subject, threshold)`, where the sender inserts first and treats a unique violation as "already sent" — atomic, matching how the job runner claims jobs with `updateMany`.
 - `mailer.ts` already exposes `smtpConfigured()`; the jobs must no-op cleanly when it returns false.
 8. **Paste-a-CDC consulta** (carried from Phase 3.2) — verify a received document through the SIFEN adapter before trusting it.
+9. **Sequence-gap check in reconciliation** (carried from Phase 1.2) — scan `DocumentSequence` ranges vs. emitted invoice numbers for the period and surface gaps in `buildReconciliation()`. Small, pure, and it is the check STRATEGY's "we emit; they observe" pitch cites — build it before that pitch is used on a prospect.
+10. **Filing status guards** — ⚠️ found in audit, not previously tracked anywhere. Filing immutability is currently **UI-enforced only**: `reopenPeriod()` is an unguarded `deleteMany` that will destroy a `SUBMITTED`/`PAID` filing (snapshot, `submittedAt`, `officialPdfPath` pointer and all — the reopen button is offered whenever `closedBy` is set, regardless of status), and `closePeriod()`'s upsert will overwrite the snapshot of a non-`DRAFT` filing while preserving its status. Both contradict the "snapshots are immutable" rule in CLAUDE.md and the tax-record retention policy. Fix in `src/lib/tax/filing.ts`: reopen refuses (or requires an explicit audited force) unless status is `DRAFT`/`CLOSED`; close refuses to overwrite a `SUBMITTED`/`PAID` snapshot. Cheap, and it must land before Phase 6 gives `client`-role users a login.
 
 ## Phase 6 — Document vault & client portal roles
 
@@ -136,18 +142,19 @@ Lowering the friction of getting a receipt into the books. Both are real product
 
 ## Phase 9 — Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split
 
-The owner holds `contador.com.py` (currently static HTML on a different Hostinger account) and wants it to read as a normal Paraguayan accounting *firm* — SEO-optimized, no SaaS/product framing — with the actual software living behind a subdomain. Same shape already proven on `clientes.com.py` / `crm.clientes.com.py`: one Node.js app, one deploy, hostname-based routing. Not a second codebase.
+Proposed in PR #10 (merged); this section is that plan with the mechanics corrected after an audit pass (PR #10's sketch was never build-tested and had two blockers as written). The goal stands: `contador.com.py` reads as a normal Paraguayan accounting *firm* (SEO-optimized, no SaaS framing) while the software lives at `sistema.contador.com.py` — one Next.js process, one deploy, hostname-based routing.
 
-1. **Hostname routing in `src/middleware.ts`.** Today's middleware (`withAuth`, matcher excludes `/login`, `/api/auth`, `/api/cron`, static assets) protects *everything else*. Split by `request.headers.get("host")`:
-   - `sistema.contador.com.py` (and any preview/staging host) → today's behavior unchanged, `withAuth` gate stays exactly as-is.
-   - `contador.com.py` / `www.contador.com.py` (the apex) → **no auth check**, routed to a new public route group; any accidental hit on an app path (`/invoices`, `/settings`, …) on the apex host 404s or redirects to the marketing home, it does not fall through to the software.
-   - Do this with an explicit host allowlist, not a "assume app unless marketing path matches" default — a misconfigured host must fail closed (marketing), never leak an app route unauthenticated.
-2. **New route group `src/app/(marketing)/`** — fully public, no session, no Prisma calls that assume a company (`getCompanyId()` must never be reached from here). Server Components, static/ISR where possible for Core Web Vitals. Pages: home, servicios (facturación electrónica, libros IVA, F.120, IRP — described as *services a firm performs*, not *features of a product*), sobre-nosotros, contacto (WhatsApp + form → existing `mailer.ts` or a lead table, no `Client`/`Company` coupling), and a blog/guides section if SEO strategy wants ongoing content. Spanish-first copy (voseo, matching `locales/es.json` conventions), separate from the app's i18n dictionaries since the audience and tone differ.
-3. **SEO baseline**: per-page `generateMetadata`, `sitemap.ts`, `robots.ts` scoped to the marketing group only (the app host should stay `noindex` — add `X-Robots-Tag: noindex` or a robots meta on every `(app)` response when host is `sistema.*`), JSON-LD `AccountingService`/`LocalBusiness` schema, OpenGraph images. Reuse `paraguay-business-apps`/`web-design-system` skill guidance for the actual page build when that starts — this phase only stages the plan.
-4. **DNS/hosting**: both `contador.com.py` (apex) and `sistema.contador.com.py` point at the *same* Node.js app on the new Hostinger Node.js hosting slot (migrating off the current static-HTML hosting for the apex). No new `$PORT`/env split — one process serves both hosts, matching `next.config.ts`'s existing `output: "standalone"` setup. Follow the `nextjs-deploy-hostinger` skill for the actual subdomain mapping steps when this is executed.
-5. **Ordering**: this can proceed in parallel with Phases 5–8 — it touches middleware and adds a new route group, no shared code with the tax/accounting modules. Sequence it before Phase 8's one-time-invoice-link (`/e/[token]`) and any future public-facing intake route, since those need the host-split decided first (is `/e/[token]` served on `sistema.*` only, or also the apex? — default: `sistema.*` only, keep the apex purely marketing).
+1. **Hostname routing in `src/middleware.ts`** — replace the bare `export default withAuth(...)` with a middleware function that branches on host **and rewrites**:
+   - App hosts (`sistema.contador.com.py`, staging/preview hosts) → today's `withAuth` behavior unchanged.
+   - Marketing hosts (`contador.com.py`, `www.`) → **rewrite to a dedicated path prefix** (e.g. `/(marketing)` pages mounted under `src/app/marketing/…`, with the middleware rewriting `/` → `/marketing`, `/servicios` → `/marketing/servicios`, …). ⚠️ **This rewrite is not optional:** route groups don't change URL paths, so `(marketing)/page.tsx` and the existing `(app)/page.tsx` would both resolve to `/` — a Next.js build error. PR #10's "route to `src/app/(marketing)/*`" only works via host-conditional rewrites to non-colliding paths.
+   - Any app path hit on a marketing host, and any unrecognized host, **fails closed to the marketing pages** — never falls through to an app route unauthenticated. Use an explicit app-host allowlist; direct navigation to `/marketing/*` on the app host should redirect out so the app host never serves indexable marketing copy.
+2. **`robots.txt` / `sitemap.xml` must become host-aware.** Today `public/robots.txt` is a static `Disallow: /` — served identically on every host, it would block the marketing site's indexing, which defeats the phase. Delete the static file and serve robots per host (middleware rewrite to two routes, or one dynamic route reading `host`): marketing → allow + sitemap pointer; app host → disallow all, plus `X-Robots-Tag: noindex` on `(app)` responses. Note the middleware matcher currently excludes `robots.txt` but **not** `sitemap.xml` — a marketing sitemap would be auth-walled unless the matcher/branching accounts for it.
+3. **Marketing pages** — public, no session, and `getCompanyId()` never reachable from them (no company context exists on the apex). Server Components, static/ISR for Core Web Vitals; Spanish-first (voseo) copy separate from the app's i18n dictionaries; pages: home, servicios (facturación electrónica, libros IVA, F.120, IRP — described as services performed, not product features), sobre-nosotros, contacto (WhatsApp + form → `mailer.ts` or a lead table; never a `Client`/`Company` row).
+4. **SEO baseline**: per-page `generateMetadata`, JSON-LD `AccountingService`/`LocalBusiness`, OpenGraph images, sitemap per item 2.
+5. **DNS/hosting**: apex + `sistema.` both point at the same Hostinger Node.js deployment (migrating the apex off its current static-HTML hosting). One `$PORT`, one `output: "standalone"` process, no env fork per host.
+6. **Ordering**: independent of Phases 5–8 code-wise. The *decision* (which host serves public intake routes) should predate Phase 8's `/e/[token]` — default `sistema.*` only — but that is a decision, not a build dependency: Phase 8's link route does not need Phase 9 built first.
 
-**Not in scope here:** rewriting the existing static HTML content — that's copy/design work for whoever builds `(marketing)/`, not an architecture decision. This phase is the routing/hosting seam only.
+**Not in scope:** rewriting the existing static-HTML copy — that's design/copy work for whoever builds the marketing pages; this phase is the routing/hosting seam only.
 
 ## Explicitly out of scope
 
@@ -166,8 +173,8 @@ Also still refused, per STRATEGY: portal credential custody, auto-filing to Mara
 | 5 — Calendar + filing archive | nothing new | calendar module + 1 migration + 1 route + cron wiring |
 | 6 — Vault + roles | Phase 5 (filings feed the vault) | 1 model + 1 route + auth pass over every action |
 | 7 — IRP | Phases 2 and 5 | new math module + 1 route, sized like Phase 1 |
-| 8 — Intake channels | Phase 6 roles | link flow small; WhatsApp gated on Meta approval |
-| 9 — Marketing/app domain split | nothing new; sequence before 8's public link route | middleware host-split + new route group + DNS move, no shared code with tax/accounting |
+| 8 — Intake channels | WhatsApp intake: Phase 6 roles (sender→company mapping); the one-time link is no-login by design and needs only the Phase 9 host decision, not roles | link flow small; WhatsApp gated on Meta approval |
+| 9 — Marketing/app domain split | nothing (decision only should predate Phase 8's public link) | middleware host-split + rewrites + route group + DNS move; no shared code with tax/accounting |
 
 Build order within Phase 5: calendar → `TaxFiling` migration → status actions → historial route → deadline card → reminder jobs. The calendar comes first because everything else displays its output.
 
