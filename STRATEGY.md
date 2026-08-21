@@ -69,7 +69,7 @@ Their real lesson is positioning: they sell an *outcome* ("your RUC stays in goo
 | Users demand true auto-filing anyway | Transcription-ready draft narrows the gap to ~2 min; revisit only via official APIs |
 | Deducibility rules drift with tax law | The calendar is data (`src/lib/tax/calendar.ts`), reviewed per SET resolution changes, versioned in git. ⚠️ The deducibility *rules table* was never built — today AI suggests a percentage per item at OCR time and a human confirms; if rules drift becomes real, build the table (PLAN Phase 2 note) |
 | AI cost/latency on expense volume | Deducibility suggestion piggybacks the OCR call (no extra request); the rules-first triage + supplier memory described in Phase 2 remain unbuilt fallbacks if volume demands them |
-| Marangatú export format changes | Parser does accent/case-insensitive header matching over the CSV/XLSX export; ⚠️ the golden-file tests this row assumes do not exist yet (ARCHITECTURE §Testing); import is additive (OCR lane unaffected) |
+| Marangatú export format changes | Parser does accent/case-insensitive header matching over the CSV/XLSX export; golden-file fixtures pin the shapes the export has been seen in (`tests/fixtures/marangatu/`); import is additive (OCR lane unaffected) |
 | Calendar table unverified vs. primary DNIT source | Now load-bearing (`TaxFiling.dueDate`, deadline card) — owner must verify `PERPETUAL_CALENDAR` against the DNIT resolution before the first production filing (PLAN Phase 5.1) |
 
 ## Sequencing logic

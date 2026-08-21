@@ -135,10 +135,9 @@ Invariants: `getCompanyId()` is never reachable from marketing pages (no company
 
 Shipped: `tests/form120.test.ts` (casilla math), `tests/deductibility.test.ts` (per-item IVA/deducible math), `tests/tax-calendar.test.ts` (per-digit due-date fixtures), `tests/tax-filing-migration.test.ts` (executes the shipped migration SQL, proves idempotence).
 
-Still missing, and worth building before the modules are touched again:
+Also shipped: `tests/marangatu-import.test.ts` (golden fixtures under `tests/fixtures/marangatu/` — accented CSV, alias headers, XLSX, error rows) and `tests/reconcile.test.ts` (fixture period → expected findings list, DB-backed).
 
-- Golden-file tests for `marangatu-import.ts` — STRATEGY's format-drift mitigation assumes these exist; they don't.
-- Reconciliation golden-file tests (period fixture → expected findings list). The pure sequence-gap half is covered by `tests/reconcile-sequence.test.ts`; the DB-backed findings list still has none.
+Still missing, and worth building before the modules are touched again:
 - `tests/parse-de.test.ts` — sample DE XML → parsed DTO → CDC re-validation (when the XML lane is built).
 Also shipped: `tests/tax-precompute.test.ts` (period arithmetic, idempotence, never clobbering a declared filing), `tests/notifications.test.ts` (reminder threshold ladder, both-locale copy, DB dedup/no-SMTP/recipient roles) and `tests/tax-filing-guards.test.ts` — deny paths for the Phase 5.10 filing status guards (reopen/re-close of `SUBMITTED`/`PAID` refuse and leave the row intact).
 

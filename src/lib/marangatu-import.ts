@@ -47,7 +47,7 @@ function normalizeHeader(h: string): string {
 const COLUMN_ALIASES: Record<keyof MarangatuRow | "rucCompleto", string[]> = {
   supplierRuc: ["ruc", "rucemisor", "rucproveedor"],
   supplierDv: ["dv", "dvemisor", "digitoverificador"],
-  rucCompleto: ["rucdv", "rucconvd"],
+  rucCompleto: ["rucdv", "rucconvd", "ruccondv"],
   supplierRazonSocial: ["razonsocial", "nombreoemisor", "nombreemisor", "proveedor", "denominacion"],
   timbrado: ["timbrado", "nrotimbrado", "numerotimbrado"],
   tipoComprobante: ["tipocomprobante", "tipodocumento", "tipodedocumento"],
@@ -113,26 +113,53 @@ function splitRucDv(raw: string): [string, string | null] {
   return [raw.replace(/\D/g, ""), null];
 }
 
+/**
+ * Reads the upload into a workbook.
+ *
+ * CSV needs its own path: handed a Buffer, the xlsx reader assumes CP1252,
+ * which turns Marangatu's UTF-8 "Razón Social" into "RazÃ³n Social" and makes
+ * the accented headers unmatchable. We decode as UTF-8 and fall back to
+ * latin1 only when that produces replacement characters, so a genuinely
+ * CP1252 export still reads.
+ */
+function readWorkbook(buffer: Buffer, isCsv: boolean): XLSX.WorkBook {
+  if (!isCsv) return XLSX.read(buffer, { type: "buffer", raw: false, cellDates: true });
+  const utf8 = buffer.toString("utf8");
+  const text = utf8.includes("\uFFFD") ? buffer.toString("latin1") : utf8;
+  return XLSX.read(text.replace(/^\uFEFF/, ""), {
+    type: "string",
+    raw: false,
+    cellDates: true,
+  });
+}
+
 /** Parses a Marangatu comprobantes export (CSV or XLSX) into normalized rows. */
 export function parseMarangatuFile(buffer: Buffer, filename: string): ParsedRow[] {
   const isCsv = filename.toLowerCase().endsWith(".csv");
-  const wb = XLSX.read(buffer, { type: "buffer", raw: false, cellDates: true });
+  const wb = readWorkbook(buffer, isCsv);
+  if (wb.SheetNames.length === 0) return [];
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: isCsv ? false : true });
   if (rows.length === 0) return [];
 
   const headers = (rows[0] as unknown[]).map((h) => String(h ?? ""));
   const colMap = buildColumnMap(headers);
-  const dataRows = rows.slice(1).filter((r) => r.some((c) => c !== undefined && c !== ""));
+  // Keep each row's original spreadsheet line number: dropping blank lines
+  // before indexing would make every error after a blank line point at the
+  // wrong line of the user's file.
+  const dataRows = rows
+    .slice(1)
+    .map((r, i) => ({ cells: r, line: i + 2 }))
+    .filter(({ cells }) => cells.some((c) => c !== undefined && c !== ""));
 
   const results: ParsedRow[] = [];
-  dataRows.forEach((r, i) => {
+  dataRows.forEach(({ cells: r, line }) => {
     const get = (field: keyof MarangatuRow) =>
       colMap[field] !== undefined ? r[colMap[field]!] : undefined;
 
     const rucRaw = String(get("supplierRuc") ?? "").trim();
     if (!rucRaw && !get("supplierRazonSocial")) {
-      results.push({ row: i + 2, data: null, error: "empty_row" });
+      results.push({ row: line, data: null, error: "empty_row" });
       return;
     }
     let ruc: string | null = null;
@@ -142,7 +169,7 @@ export function parseMarangatuFile(buffer: Buffer, filename: string): ParsedRow[
       const dvColumn = get("supplierDv");
       if (dvColumn) dv = String(dvColumn).trim();
       if (dv && ruc && !validarRuc(ruc, dv)) {
-        results.push({ row: i + 2, data: null, error: "ruc_invalid" });
+        results.push({ row: line, data: null, error: "ruc_invalid" });
         return;
       }
     }
@@ -150,12 +177,12 @@ export function parseMarangatuFile(buffer: Buffer, filename: string): ParsedRow[
     const total = parseNumber(get("total"));
     const fecha = parseDate(get("fecha"));
     if (total <= 0) {
-      results.push({ row: i + 2, data: null, error: "missing_total" });
+      results.push({ row: line, data: null, error: "missing_total" });
       return;
     }
 
     results.push({
-      row: i + 2,
+      row: line,
       error: null,
       data: {
         supplierRuc: ruc,
