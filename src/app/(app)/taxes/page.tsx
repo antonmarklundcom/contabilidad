@@ -197,6 +197,7 @@ export default async function TaxesPage({
               clean={reconciliation.clean}
               closedBy={close?.closedBy ?? null}
               closedAt={close?.closedAt ?? null}
+              status={close?.status ?? null}
             />
           </div>
         </CardContent>

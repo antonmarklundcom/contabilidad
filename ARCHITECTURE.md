@@ -30,7 +30,8 @@ Next.js 15 App Router (standalone, single process)
 │   ├── deductibility.ts       per-item IVA + deducible totals (pure math)
 │   ├── marangatu-import.ts    Marangatú CSV/XLSX comprobante-export parser
 │   ├── tax/                   calendar.ts (perpetual due dates), filing.ts
-│   │                          (TaxFiling lifecycle), deadline.ts (next-due card)
+│   │                          (TaxFiling lifecycle), filing-status.ts (pure
+│   │                          immutability guards), deadline.ts (next-due card)
 │   ├── ocr.ts                 vision extraction + LOCAL validation
 │   ├── jobs/                  DB queue + in-process runner + /api/cron
 │   ├── kude.ts                pdfkit KuDE generator
@@ -53,7 +54,7 @@ Load-bearing invariants (do not weaken while extending):
 3. **Money is deterministic**: PYG integers end-to-end; IVA extracted from IVA-included prices; covered by tests.
 4. **Sequential numbers are race-safe** (atomic increment) and gaps are detectable.
 5. **Every company-scoped query filters by `companyId`** via `getCompanyId()` — the multi-tenant seam.
-6. **Tax artifacts are write-once** on disk; mutations audit(). ⚠️ The DB side of this is currently weaker than the docs claimed: `TaxFiling` snapshot immutability is UI-enforced only — see PLAN Phase 5.10 for the missing status guards in `tax/filing.ts`.
+6. **Tax artifacts are write-once** on disk; mutations audit(). The DB side is enforced too since PLAN Phase 5.10: `closePeriod`/`reopenPeriod` refuse to rewrite or withdraw a `SUBMITTED`/`PAID` filing, guarded atomically in the write statement itself (`tax/filing.ts`, rule in `tax/filing-status.ts`).
 
 ## Extension 1 — Tax module (`src/lib/tax/`) — PLAN Phase 1–2
 
@@ -136,6 +137,6 @@ Still missing, and worth building before the modules are touched again:
 - Golden-file tests for `marangatu-import.ts` — STRATEGY's format-drift mitigation assumes these exist; they don't.
 - Reconciliation golden-file tests (period fixture → expected findings list) — `reconcile.ts` currently has no tests at all.
 - `tests/parse-de.test.ts` — sample DE XML → parsed DTO → CDC re-validation (when the XML lane is built).
-- Deny-path tests for the Phase 5.10 filing status guards once they exist (reopen/re-close of `SUBMITTED`/`PAID` must refuse).
+Also shipped: `tests/tax-filing-guards.test.ts` — deny paths for the Phase 5.10 filing status guards (reopen/re-close of `SUBMITTED`/`PAID` refuse and leave the row intact).
 
 All follow the existing Vitest setup and the "skips gracefully if no DB" pattern where DB-bound.

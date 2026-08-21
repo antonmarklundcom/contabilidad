@@ -127,10 +127,21 @@ export async function setSaldoAnterior(
 
 /**
  * Period close moved to the `TaxFiling` model in `src/lib/tax/filing.ts`.
- * Re-exported here so existing callers keep the import path they had; the
- * signatures are unchanged.
+ * Re-exported here so existing callers keep the import path they had.
+ * `closePeriod`/`reopenPeriod` now return a result object because both can
+ * refuse a locked (SUBMITTED/PAID) filing — see PLAN Phase 5.10.
  */
-export { getPeriodClose, closePeriod, reopenPeriod, type PeriodClose } from "@/lib/tax/filing";
+export {
+  getPeriodClose,
+  closePeriod,
+  reopenPeriod,
+  canReopenFiling,
+  canOverwriteSnapshot,
+  MUTABLE_FILING_STATUSES,
+  type PeriodClose,
+  type ClosePeriodResult,
+  type ReopenPeriodResult,
+} from "@/lib/tax/filing";
 
 export async function buildForm120(
   companyId: string,

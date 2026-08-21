@@ -456,6 +456,7 @@
     "closeBlockedHint": "Resolvé los documentos pendientes antes de cerrar el período.",
     "closedBy": "Período cerrado por {user} el {date}",
     "reopen": "Reabrir",
+    "filingLockedHint": "La declaración ya fue presentada a la DNIT: sus cifras quedan congeladas y no se pueden reabrir ni volver a cerrar.",
     "filingStatus": {
       "DRAFT": "Borrador",
       "CLOSED": "Cerrado",
