@@ -80,6 +80,7 @@ model Company {
   settings         Setting[]
   taxFilings       TaxFiling[]
   notificationLogs NotificationLog[]
+  documents        Document[]
 }
 
 /// A tax return for one period: the durable record that replaces the
@@ -489,6 +490,43 @@ model JobQueue {
   updatedAt   DateTime  @updatedAt
 
   @@index([status, nextRunAt])
+}
+
+// ── Document vault ──────────────────────────────────────────────────────────
+
+enum DocumentKind {
+  BANK_STATEMENT
+  DNIT_NOTICE
+  CONTRACT
+  CERTIFICATE
+  FILING
+  OTHER
+}
+
+/// A file kept for the company: bank statements, DNIT notices, contracts,
+/// certificates, and the DNIT filing receipts Phase 5 already stores (those
+/// get a Document row pointing at the same file, so the vault is not a second
+/// silo). Files live under STORAGE_DIR/documents, read-confined like every
+/// other bucket, and are never deleted.
+model Document {
+  id         String       @id @default(cuid())
+  companyId  String
+  kind       DocumentKind @default(OTHER)
+  title      String
+  filePath   String
+  mimeType   String
+  sizeBytes  Int
+  /// When the document is dated / was received, which is not when it was uploaded.
+  receivedAt DateTime     @default(now())
+  uploadedBy String?
+  notes      String?      @db.Text
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, receivedAt])
+  @@index([companyId, kind])
 }
 
 // ── Compliance reminders (filing due, timbrado / certificate expiry) ────────

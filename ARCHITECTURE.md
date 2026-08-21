@@ -11,6 +11,7 @@ Next.js 15 App Router (standalone, single process)
 │   ├── invoices/  clients/  products/   emission side
 │   ├── expenses/                        capture side (OCR upload + review + import)
 │   ├── books/  reports/                 accounting outputs
+│   ├── documents/                       document vault
 │   ├── taxes/                           F.120 draft, close, historial archive
 │   └── settings/                        company, cert, sequences, users
 │
@@ -30,6 +31,7 @@ Next.js 15 App Router (standalone, single process)
 │   ├── deductibility.ts       per-item IVA + deducible totals (pure math)
 │   ├── marangatu-import.ts    Marangatú CSV/XLSX comprobante-export parser
 │   ├── notifications.ts       reminder ladder + NotificationLog dedup
+│   ├── documents.ts           document vault (upload rules, company-scoped)
 │   ├── tax/                   calendar.ts (perpetual due dates), filing.ts
 │   │                          (TaxFiling lifecycle), filing-status.ts (pure
 │   │                          immutability guards), deadline.ts (next-due
@@ -46,8 +48,8 @@ Next.js 15 App Router (standalone, single process)
 └── Prisma/PostgreSQL
     User, Company, Establishment, ExpeditionPoint, DocumentSequence,
     Client, Product, Invoice, InvoiceLine, ExpenseCategory, Expense,
-    ExpenseItem, SupplierCategoryMap, TaxFiling, NotificationLog, JobQueue,
-    SifenLog, AuditLog, Setting
+    ExpenseItem, SupplierCategoryMap, TaxFiling, NotificationLog, Document,
+    JobQueue, SifenLog, AuditLog, Setting
 ```
 
 Load-bearing invariants (do not weaken while extending):
@@ -139,6 +141,6 @@ Also shipped: `tests/marangatu-import.test.ts` (golden fixtures under `tests/fix
 
 Still missing, and worth building before the modules are touched again:
 - `tests/parse-de.test.ts` — sample DE XML → parsed DTO → CDC re-validation (when the XML lane is built).
-Also shipped: `tests/tax-precompute.test.ts` (period arithmetic, idempotence, never clobbering a declared filing), `tests/notifications.test.ts` (reminder threshold ladder, both-locale copy, DB dedup/no-SMTP/recipient roles) and `tests/tax-filing-guards.test.ts` — deny paths for the Phase 5.10 filing status guards (reopen/re-close of `SUBMITTED`/`PAID` refuse and leave the row intact).
+Also shipped: `tests/documents.test.ts` (vault upload rules + cross-company deny paths), `tests/tax-precompute.test.ts` (period arithmetic, idempotence, never clobbering a declared filing), `tests/notifications.test.ts` (reminder threshold ladder, both-locale copy, DB dedup/no-SMTP/recipient roles) and `tests/tax-filing-guards.test.ts` — deny paths for the Phase 5.10 filing status guards (reopen/re-close of `SUBMITTED`/`PAID` refuse and leave the row intact).
 
 All follow the existing Vitest setup and the "skips gracefully if no DB" pattern where DB-bound.
