@@ -10,6 +10,7 @@ import { enqueueJob } from "@/lib/jobs/queue";
 import { runPendingJobs } from "@/lib/jobs/runner";
 import { audit } from "@/lib/audit";
 import { sendInvoiceEmail, smtpConfigured } from "@/lib/mailer";
+import { allowed } from "@/lib/authz";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T }
@@ -99,6 +100,7 @@ export async function saveDraftAction(
   id: string | null,
   input: InvoiceInput
 ): Promise<ActionResult<{ id: string }>> {
+  if (!(await allowed("invoices:write"))) return { ok: false, error: "forbidden" };
   const res = await persistDraft(id, input);
   if ("errors" in res) return { ok: false, error: "validation", errors: res.errors };
   revalidatePath("/invoices");
@@ -109,6 +111,7 @@ export async function emitInvoiceAction(
   id: string | null,
   input: InvoiceInput
 ): Promise<ActionResult<{ id: string }>> {
+  if (!(await allowed("invoices:emit"))) return { ok: false, error: "forbidden" };
   const res = await persistDraft(id, input);
   if ("errors" in res) return { ok: false, error: "validation", errors: res.errors };
   try {
@@ -128,6 +131,7 @@ export async function duplicateInvoiceAction(
   id: string,
   opts?: { asCreditNote?: boolean }
 ): Promise<ActionResult<{ id: string }>> {
+  if (!(await allowed("invoices:write"))) return { ok: false, error: "forbidden" };
   const companyId = await getCompanyId();
   const original = await prisma.invoice.findFirst({
     where: { id, companyId },
@@ -190,6 +194,7 @@ export async function cancelInvoiceAction(
   id: string,
   reason: string
 ): Promise<ActionResult> {
+  if (!(await allowed("invoices:emit"))) return { ok: false, error: "forbidden" };
   if (!reason || reason.trim().length < 5) {
     return { ok: false, error: "reason_required" };
   }
@@ -205,6 +210,7 @@ export async function cancelInvoiceAction(
 }
 
 export async function retrySendAction(id: string): Promise<ActionResult> {
+  if (!(await allowed("invoices:emit"))) return { ok: false, error: "forbidden" };
   const companyId = await getCompanyId();
   const invoice = await prisma.invoice.findFirst({ where: { id, companyId } });
   if (!invoice) return { ok: false, error: "not_found" };
@@ -228,6 +234,7 @@ export async function sendInvoiceEmailAction(
   id: string,
   to: string
 ): Promise<ActionResult> {
+  if (!(await allowed("invoices:write"))) return { ok: false, error: "forbidden" };
   if (!smtpConfigured()) return { ok: false, error: "no_smtp" };
   const companyId = await getCompanyId();
   const invoice = await prisma.invoice.findFirst({

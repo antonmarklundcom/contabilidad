@@ -10,12 +10,14 @@ import { audit } from "@/lib/audit";
 import { markSubmitted, markPaid, setFilingNotes } from "@/lib/tax/filing";
 import { filingTransitionSchema, filingNotesSchema } from "@/lib/validators";
 import { enqueueJob } from "@/lib/jobs/queue";
+import { allowed } from "@/lib/authz";
 
 export async function saveSaldoAnterior(
   year: number,
   month: number,
   value: number
 ): Promise<{ ok: boolean }> {
+  if (!(await allowed("taxes:close"))) return { ok: false };
   if (!Number.isFinite(value) || value < 0) return { ok: false };
   const companyId = await getCompanyId();
   await setSaldoAnterior(companyId, year, month, Math.round(value));
@@ -30,6 +32,7 @@ export async function closePeriodAction(
   year: number,
   month: number
 ): Promise<{ ok: boolean; error?: string }> {
+  if (!(await allowed("taxes:close"))) return { ok: false, error: "forbidden" };
   const companyId = await getCompanyId();
   const reconciliation = await buildReconciliation(companyId, year, month);
   if (!reconciliation.clean) {
@@ -64,6 +67,7 @@ export async function reopenPeriodAction(
   year: number,
   month: number
 ): Promise<{ ok: boolean; error?: string }> {
+  if (!(await allowed("taxes:close"))) return { ok: false, error: "forbidden" };
   const companyId = await getCompanyId();
   const period = `${year}-${String(month).padStart(2, "0")}`;
   const result = await reopenPeriod(companyId, year, month);
@@ -86,6 +90,7 @@ export async function reopenPeriodAction(
  * succeeding — these are tax-record changes and must not be lossy.
  */
 export async function markSubmittedAction(input: unknown): Promise<{ ok: boolean; error?: string }> {
+  if (!(await allowed("taxes:close"))) return { ok: false, error: "forbidden" };
   const parsed = filingTransitionSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid" };
   const companyId = await getCompanyId();
@@ -101,6 +106,7 @@ export async function markSubmittedAction(input: unknown): Promise<{ ok: boolean
 }
 
 export async function markPaidAction(input: unknown): Promise<{ ok: boolean; error?: string }> {
+  if (!(await allowed("taxes:close"))) return { ok: false, error: "forbidden" };
   const parsed = filingTransitionSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid" };
   const companyId = await getCompanyId();
@@ -116,6 +122,7 @@ export async function markPaidAction(input: unknown): Promise<{ ok: boolean; err
 }
 
 export async function saveFilingNotesAction(input: unknown): Promise<{ ok: boolean; error?: string }> {
+  if (!(await allowed("taxes:close"))) return { ok: false, error: "forbidden" };
   const parsed = filingNotesSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "invalid" };
   const companyId = await getCompanyId();

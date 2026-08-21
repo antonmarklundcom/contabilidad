@@ -20,6 +20,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { canOpen, type Role } from "@/lib/roles";
 import { useI18n } from "@/components/i18n-provider";
 import { LanguageSwitch } from "@/components/language-switch";
 import { Button } from "@/components/ui/button";
@@ -56,12 +57,14 @@ export function AppShell({
   sifenMode,
   userName,
   userEmail,
+  role,
   children,
 }: {
   companyName: string;
   sifenMode: string;
   userName: string;
   userEmail: string;
+  role: Role;
   children: React.ReactNode;
 }) {
   const { t } = useI18n();
@@ -70,7 +73,9 @@ export function AppShell({
 
   const nav = (
     <nav className="flex flex-1 flex-col gap-0.5 p-3">
-      {NAV.map((item) => {
+      {/* Hide what the middleware would bounce anyway — the server still
+          refuses it either way (src/lib/roles.ts). */}
+      {NAV.filter((item) => canOpen(role, item.href)).map((item) => {
         const active =
           item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
         return (

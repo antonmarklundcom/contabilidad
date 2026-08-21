@@ -11,6 +11,7 @@ declare module "next-auth" {
       name: string;
       companyId: string | null;
       locale: string;
+      role: string;
     };
   }
   interface User {
@@ -19,6 +20,7 @@ declare module "next-auth" {
     name: string;
     companyId: string | null;
     locale: string;
+    role: string;
   }
 }
 
@@ -46,6 +48,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           companyId: user.companyId,
           locale: user.locale,
+          role: user.role,
         };
       },
     }),
@@ -56,6 +59,7 @@ export const authOptions: NextAuthOptions = {
         token.userId = user.id;
         token.companyId = user.companyId;
         token.locale = user.locale;
+        token.role = user.role;
       }
       return token;
     },
@@ -63,6 +67,7 @@ export const authOptions: NextAuthOptions = {
       session.user.id = token.userId as string;
       session.user.companyId = (token.companyId as string | null) ?? null;
       session.user.locale = (token.locale as string) ?? "es";
+      session.user.role = (token.role as string) ?? "client";
       return session;
     },
   },

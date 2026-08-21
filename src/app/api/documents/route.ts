@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCompanyId } from "@/lib/company";
 import { audit } from "@/lib/audit";
+import { allowed } from "@/lib/authz";
 import {
   createDocument,
   isAllowedMimeType,
@@ -21,6 +22,10 @@ import type { DocumentKind } from "@prisma/client";
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  if (!(await allowed("documents:write"))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   const companyId = await getCompanyId();
   const form = await req.formData();

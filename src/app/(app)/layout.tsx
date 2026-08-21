@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getSifenMode } from "@/lib/sifen";
 import { AppShell } from "@/components/app-shell";
 import { startJobRunner } from "@/lib/jobs/runner";
+import { normalizeRole } from "@/lib/roles";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -21,6 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       sifenMode={getSifenMode()}
       userName={session.user.name ?? session.user.email ?? ""}
       userEmail={session.user.email ?? ""}
+      role={normalizeRole(session.user.role)}
     >
       {children}
     </AppShell>

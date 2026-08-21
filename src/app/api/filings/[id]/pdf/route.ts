@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { allowed } from "@/lib/authz";
 import { getCompanyId } from "@/lib/company";
 import { prisma } from "@/lib/prisma";
 import { saveFile, readFile } from "@/lib/storage";
@@ -25,6 +26,9 @@ async function filingForRequest(id: string) {
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await allowed("taxes:close"))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   const { id } = await params;
   const { companyId, filing } = await filingForRequest(id);

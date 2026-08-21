@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { allowed } from "@/lib/authz";
 import { parseMarangatuFile } from "@/lib/marangatu-import";
 import { importMarangatuRows } from "@/app/(app)/expenses/actions";
 
@@ -15,6 +16,9 @@ const ALLOWED = [
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await allowed("expenses:write"))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   const form = await req.formData();
   const file = form.get("file");

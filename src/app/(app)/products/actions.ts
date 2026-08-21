@@ -5,11 +5,13 @@ import { prisma } from "@/lib/prisma";
 import { getCompanyId } from "@/lib/company";
 import { productSchema, type ProductInput } from "@/lib/validators";
 import { audit } from "@/lib/audit";
+import { allowed } from "@/lib/authz";
 
 export async function saveProduct(
   id: string | null,
   input: ProductInput
 ): Promise<{ ok: true; id: string } | { ok: false; errors: Record<string, string> }> {
+  if (!(await allowed("catalog:write"))) return { ok: false, errors: { form: "forbidden" } };
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) {
     const errors: Record<string, string> = {};
@@ -53,6 +55,7 @@ export async function saveProduct(
 }
 
 export async function deleteProduct(id: string): Promise<{ ok: boolean; reason?: string }> {
+  if (!(await allowed("catalog:write"))) return { ok: false, reason: "forbidden" };
   const companyId = await getCompanyId();
   const usage = await prisma.invoiceLine.count({ where: { productId: id } });
   if (usage > 0) {

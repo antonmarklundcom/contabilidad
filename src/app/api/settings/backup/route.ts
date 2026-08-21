@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { allowed } from "@/lib/authz";
 import { createBackup } from "@/lib/backup";
 import { storageDir } from "@/lib/storage";
 import { audit } from "@/lib/audit";
@@ -13,6 +14,9 @@ export const maxDuration = 120;
 export async function POST() {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await allowed("settings:write"))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
   const zipPath = await createBackup();
   await audit("create", "backup", undefined, { manual: true });
   const data = await fs.promises.readFile(zipPath);
