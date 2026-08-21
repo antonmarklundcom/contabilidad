@@ -85,7 +85,7 @@ Tax modules live directly in `src/lib/` (not `src/lib/tax/` — see ARCHITECTURE
 
 ## Tests
 
-`tests/` (Vitest, `npm test`): RUC check digit vs the library, CDC format + library equality, IVA/totals math, sequence increment under concurrency (skips gracefully if no DB), F.120 casilla math (`form120.test.ts`), per-item deducibility math (`deductibility.test.ts`), perpetual-calendar due dates per RUC digit (`tax-calendar.test.ts`), and TaxFiling migration idempotence (`tax-filing-migration.test.ts`). These protect money; keep them green. Known holes: `reconcile.ts` and `marangatu-import.ts` have no tests (see ARCHITECTURE §Testing).
+`tests/` (Vitest, `npm test`): RUC check digit vs the library, CDC format + library equality, IVA/totals math, sequence increment under concurrency (skips gracefully if no DB), F.120 casilla math (`form120.test.ts`), per-item deducibility math (`deductibility.test.ts`), perpetual-calendar due dates per RUC digit (`tax-calendar.test.ts`), TaxFiling migration idempotence (`tax-filing-migration.test.ts`), golden-file parsing of Marangatú exports (`marangatu-import.test.ts`, fixtures in `tests/fixtures/marangatu/`), and the period reconciliation findings list (`reconcile.test.ts`, `reconcile-sequence.test.ts`). These protect money; keep them green.
 
 ## Database changes
 
