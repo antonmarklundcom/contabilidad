@@ -16,6 +16,7 @@ export function buildCompanyConfig(
 ): CompanyConfig {
   return {
     version: SIFEN_VERSION,
+    companyId: company.id,
     ruc: formatRuc(company.ruc, company.dv),
     razonSocial: company.razonSocial,
     nombreFantasia: company.nombreFantasia ?? undefined,

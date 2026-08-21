@@ -57,7 +57,7 @@ Their real lesson is positioning: they sell an *outcome* ("your RUC stays in goo
 ## Market posture
 
 - **Wedge:** owner-operators and small estudios contables in Paraguay who already must emit DTEs (SIFEN adoption is mandatory-and-expanding) and dread the monthly F.120 ritual. Emission is the daily hook; the monthly close is the retention moment.
-- **Estudio angle (later):** roles are enforced as of PLAN Phase 6.3 and multi-tenant is one lookup away (`getCompanyId()`); an accountant managing N clients gets N ready-to-review drafts on the 1st. The competitor sells to the business owner; the estudio channel scales better per sale.
+- **Estudio angle:** roles are enforced and `getCompanyId()` is session-scoped as of PLAN Phase 6.3–6.4, so the channel is open; an accountant managing N clients gets N ready-to-review drafts on the 1st. The competitor sells to the business owner; the estudio channel scales better per sale.
 - **Trust artifacts over ads:** the exportable, human-signed close report is itself the marketing — it's what gets forwarded to (and impresses) the client's accountant.
 - **Language:** Paraguayan Spanish with voseo first (already done), English second — matches both local owners and the foreign-entrepreneur segment the competitor is courting.
 

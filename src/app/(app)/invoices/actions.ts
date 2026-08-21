@@ -242,7 +242,7 @@ export async function sendInvoiceEmailAction(
     include: { client: true },
   });
   if (!invoice) return { ok: false, error: "not_found" };
-  const company = await prisma.company.findFirst();
+  const company = await prisma.company.findUnique({ where: { id: companyId } });
   const attachments: { path: string; filename?: string }[] = [];
   if (invoice.kudePath) attachments.push({ path: invoice.kudePath });
   if (invoice.signedXmlPath) attachments.push({ path: invoice.signedXmlPath });
