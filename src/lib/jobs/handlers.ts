@@ -1,5 +1,6 @@
 import { sendInvoiceToSifen, queryInvoiceStatus, cancelInvoice, regenerateKude } from "@/lib/dte";
 import { createBackup } from "@/lib/backup";
+import { sendReminderEmail, type ReminderKind } from "@/lib/notifications";
 
 export async function runJobHandler(
   type: string,
@@ -20,6 +21,14 @@ export async function runJobHandler(
       return;
     case "backup":
       await createBackup();
+      return;
+    case "filing_reminder":
+      await sendReminderEmail({
+        companyId: String(payload.companyId),
+        kind: String(payload.kind) as ReminderKind,
+        dueDate: String(payload.dueDate),
+        detail: String(payload.detail ?? ""),
+      });
       return;
     default:
       throw new Error(`Unknown job type: ${type}`);

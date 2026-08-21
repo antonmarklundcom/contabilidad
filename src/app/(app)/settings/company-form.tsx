@@ -19,6 +19,7 @@ export interface CompanyValues {
   nombreFantasia: string;
   timbradoNumero: string;
   timbradoFechaInicio: string;
+  timbradoFechaFin: string;
   tipoContribuyente: number;
   tipoRegimen: number | null;
   direccion: string;
@@ -101,7 +102,7 @@ export function CompanyForm({ initial }: { initial: CompanyValues }) {
               <Label>{t("settings.nombreFantasia")}</Label>
               <Input value={v.nombreFantasia} onChange={(e) => set("nombreFantasia", e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <div className="space-y-1.5">
                 <Label>{t("settings.timbrado")}</Label>
                 <Input value={v.timbradoNumero} onChange={(e) => set("timbradoNumero", e.target.value)} />
@@ -113,6 +114,17 @@ export function CompanyForm({ initial }: { initial: CompanyValues }) {
                   value={v.timbradoFechaInicio}
                   onChange={(e) => set("timbradoFechaInicio", e.target.value)}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("settings.timbradoDateEnd")}</Label>
+                <Input
+                  type="date"
+                  value={v.timbradoFechaFin}
+                  onChange={(e) => set("timbradoFechaFin", e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t("settings.timbradoDateEndHint")}
+                </p>
               </div>
             </div>
           </div>

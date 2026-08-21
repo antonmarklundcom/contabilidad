@@ -42,8 +42,9 @@ KuDE PDF is `src/lib/kude.ts` (pdfkit + `qrcode`). In mock mode it stamps a "SIN
 
 - `src/lib/jobs/queue.ts` — `enqueueJob()`, exponential backoff.
 - `src/lib/jobs/runner.ts` — `startJobRunner()` (in-process interval, started from the app-group layout) + `runPendingJobs()` (also called by `/api/cron`). Jobs are claimed with an atomic `updateMany` so the interval and cron never double-run one.
-- `src/lib/jobs/handlers.ts` — dispatch: `send_dte`, `query_status`, `generate_kude`, `cancel_dte`, `backup`.
-- `/api/cron` — authenticated by `x-cron-secret`; also enqueues the nightly backup if due.
+- `src/lib/jobs/handlers.ts` — dispatch: `send_dte`, `query_status`, `generate_kude`, `cancel_dte`, `backup`, `filing_reminder`.
+- `/api/cron` — authenticated by `x-cron-secret`; also enqueues the nightly backup if due and scans for compliance reminders.
+- `src/lib/notifications.ts` — filing/timbrado/certificate reminders. The threshold ladder is pure (`reminderThreshold`); "never twice" is the `NotificationLog` unique constraint, inserted *before* the job is queued so a unique violation means "already sent". No SMTP ⇒ nothing logged, nothing queued.
 
 ## Tax calendar & filings (`src/lib/tax/`)
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runPendingJobs } from "@/lib/jobs/runner";
 import { enqueueNightlyBackupIfDue } from "@/lib/backup";
+import { enqueueDueReminders } from "@/lib/notifications";
 
 /**
  * External cron entry point. Protect with the x-cron-secret header:
@@ -13,8 +14,11 @@ async function handle(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   await enqueueNightlyBackupIfDue();
+  // Compliance reminders: due filings, timbrado and certificate expiry. A
+  // clean no-op when SMTP is unconfigured, so nothing is marked as sent.
+  const reminders = await enqueueDueReminders();
   const { processed } = await runPendingJobs();
-  return NextResponse.json({ ok: true, processed });
+  return NextResponse.json({ ok: true, processed, reminders: reminders.enqueued });
 }
 
 export const GET = handle;
