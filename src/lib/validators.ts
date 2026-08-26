@@ -153,6 +153,44 @@ export const irpYearSchema = z.object({
   year: z.number().int().min(2019).max(2100),
 });
 
+/**
+ * What the anonymous one-time-link form may post (PLAN Phase 8.1).
+ *
+ * Deliberately narrower than `invoiceSchema`: the company, document type,
+ * expedition point and currency come off the stored link, not off the form.
+ * The redeemer chooses only who is being invoiced and what is on it.
+ */
+export const invoiceLinkRedeemSchema = z.object({
+  docType: z.enum(["RUC", "CI", "INNOMINADO"]),
+  ruc: z.string().trim().regex(/^[0-9]{1,8}$/, "invalid").optional().or(z.literal("")),
+  dv: z.string().trim().regex(/^[0-9]$/, "invalid").optional().or(z.literal("")),
+  documentoNumero: z.string().trim().max(30).optional().or(z.literal("")),
+  razonSocial: z.string().trim().min(1).max(255),
+  email: z.string().trim().email().optional().or(z.literal("")),
+  condicionVenta: z.coerce.number().refine((v) => [1, 2].includes(v)).default(1),
+  // A public form is a public form: cap the line count so one redemption
+  // cannot be used to write an unbounded number of rows.
+  lines: z.array(invoiceLineSchema).min(1).max(50),
+}).superRefine((val, ctx) => {
+  if (val.docType === "RUC") {
+    if (!val.ruc) {
+      ctx.addIssue({ code: "custom", path: ["ruc"], message: "required" });
+    } else if (!val.dv || !validarRuc(val.ruc, val.dv)) {
+      ctx.addIssue({ code: "custom", path: ["dv"], message: "dv_mismatch" });
+    }
+  }
+  if (val.docType === "CI" && !val.documentoNumero) {
+    ctx.addIssue({ code: "custom", path: ["documentoNumero"], message: "required" });
+  }
+});
+
+/** How a one-time link is issued. Everything else is server-decided. */
+export const invoiceLinkCreateSchema = z.object({
+  establecimiento: z.string().regex(/^[0-9]{3}$/),
+  punto: z.string().regex(/^[0-9]{3}$/),
+  note: z.string().trim().max(200).optional().or(z.literal("")),
+});
+
 export const documentKindSchema = z.enum([
   "BANK_STATEMENT",
   "DNIT_NOTICE",
@@ -175,5 +213,7 @@ export type DocumentMetaInput = z.infer<typeof documentMetaSchema>;
 
 export type FilingTransitionInput = z.infer<typeof filingTransitionSchema>;
 export type FilingNotesInput = z.infer<typeof filingNotesSchema>;
+export type InvoiceLinkRedeemInput = z.infer<typeof invoiceLinkRedeemSchema>;
+export type InvoiceLinkCreateInput = z.infer<typeof invoiceLinkCreateSchema>;
 export type IrpRegimeInput = z.infer<typeof irpRegimeSchema>;
 export type IrpYearInput = z.infer<typeof irpYearSchema>;

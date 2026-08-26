@@ -81,6 +81,7 @@ model Company {
   taxFilings       TaxFiling[]
   notificationLogs NotificationLog[]
   documents        Document[]
+  invoiceLinks     InvoiceLink[]
 }
 
 /// A tax return for one period: the durable record that replaces the
@@ -341,10 +342,52 @@ model Invoice {
   lines           InvoiceLine[]
   originalInvoice Invoice?      @relation("NotaOriginal", fields: [originalInvoiceId], references: [id])
   notas           Invoice[]     @relation("NotaOriginal")
+  invoiceLink     InvoiceLink?
 
   @@unique([companyId, tipoDocumento, establecimiento, punto, numero])
   @@index([companyId, status])
   @@index([companyId, issueDate])
+}
+
+/// A one-time, short-lived link that lets someone emit ONE invoice without a
+/// login (PLAN Phase 8.1).
+///
+/// The token itself is never stored — only its keyed HMAC, the same way a
+/// password-reset token is handled. A read of this table therefore yields no
+/// usable link, and a *write* to it cannot forge one either without the
+/// server's signing key. See src/lib/invoice-link.ts.
+///
+/// Everything the emission is allowed to do is pinned here rather than posted
+/// by the caller: the company, the document type, and the expedition point.
+/// The redeemer chooses only the buyer and the lines.
+model InvoiceLink {
+  id        String @id @default(cuid())
+  companyId String
+  /// HMAC-SHA256 of the token, hex. Unique so a redemption is a single
+  /// indexed lookup and a collision is a constraint error, not a mix-up.
+  tokenHash String @unique
+  /// 1 = Factura. Stored rather than assumed so widening the scope later is
+  /// a data change with an existing enforcement point.
+  tipoDocumento   Int    @default(1)
+  establecimiento String
+  punto           String
+  moneda          String @default("PYG")
+  /// Checked server-side against this column only — never against anything
+  /// the client sends.
+  expiresAt DateTime
+  /// Set atomically at the moment of claim, BEFORE the invoice is emitted.
+  usedAt    DateTime?
+  /// The document this link produced, once it has produced one.
+  invoiceId String?   @unique
+  /// Who issued the link, for the audit trail.
+  createdBy String?
+  note      String?
+  createdAt DateTime  @default(now())
+
+  company Company  @relation(fields: [companyId], references: [id])
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([companyId, expiresAt])
 }
 
 model InvoiceLine {
