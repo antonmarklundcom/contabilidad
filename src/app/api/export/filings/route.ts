@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCompanyId } from "@/lib/company";
 import { listFilings } from "@/lib/tax/filing";
+import { periodLabel } from "@/lib/tax/filing-period";
 import { toCsv, csvResponse } from "@/lib/csv";
 import type { Form120Data } from "@/lib/form120";
 
@@ -45,7 +46,7 @@ export async function GET(req: Request) {
     const s = f.snapshot as unknown as Partial<Form120Data> | null;
     return [
       f.type,
-      f.month === null ? String(f.year) : `${f.year}-${String(f.month).padStart(2, "0")}`,
+      periodLabel(f.year, f.month),
       f.status,
       iso(f.dueDate),
       s?.ventas?.debitoFiscal ?? 0,

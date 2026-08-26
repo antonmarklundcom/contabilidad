@@ -9,6 +9,7 @@
 import { prisma } from "@/lib/prisma";
 import { formatRuc } from "@/lib/sifen/ruc";
 import { daysUntil, ivaDueDate, nextIvaFiling } from "@/lib/tax/calendar";
+import { isAnnualPeriod } from "@/lib/tax/filing-period";
 import type { TaxFilingStatus } from "@prisma/client";
 
 export interface NextDeadline {
@@ -57,7 +58,10 @@ export async function nextDeadline(
     },
     orderBy: { dueDate: "asc" },
   });
-  if (overdueFiling && overdueFiling.month !== null) {
+  // `type: "IVA"` guarantees a real month, but assert it rather than assume:
+  // an annual row carries ANNUAL_MONTH (0), which is not a period this card
+  // can link to.
+  if (overdueFiling && !isAnnualPeriod(overdueFiling.month)) {
     return {
       type: "IVA",
       year: overdueFiling.year,

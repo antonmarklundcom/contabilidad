@@ -4,6 +4,7 @@ import { getT } from "@/lib/i18n-server";
 import { formatMoney, formatDate } from "@/lib/i18n";
 import { listFilings } from "@/lib/tax/filing";
 import type { Form120Data } from "@/lib/form120";
+import { periodLabel } from "@/lib/tax/filing-period";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import {
@@ -94,10 +95,7 @@ export default async function FilingHistoryPage({
               <TableBody>
                 {rows.map((f) => {
                   const snapshot = f.snapshot as unknown as Partial<Form120Data> | null;
-                  const period =
-                    f.month === null
-                      ? String(f.year)
-                      : `${f.year}-${String(f.month).padStart(2, "0")}`;
+                  const period = periodLabel(f.year, f.month);
                   return (
                     <TableRow key={f.id}>
                       <TableCell>
