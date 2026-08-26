@@ -5,6 +5,7 @@ import { getCompanyId } from "@/lib/company";
 import { getT } from "@/lib/i18n-server";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/i18n";
 import type { Form120Data } from "@/lib/form120";
+import { periodLabel, isAnnualPeriod } from "@/lib/tax/filing-period";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -27,10 +28,7 @@ export default async function FilingDetailPage({
 
   const s = filing.snapshot as unknown as Form120Data;
   const money = (v: number) => formatMoney(v ?? 0, "PYG", locale);
-  const period =
-    filing.month === null
-      ? String(filing.year)
-      : `${filing.year}-${String(filing.month).padStart(2, "0")}`;
+  const period = periodLabel(filing.year, filing.month);
 
   const Row = ({ label, value, bold }: { label: string; value: number; bold?: boolean }) => (
     <div className={`flex justify-between py-1 text-sm ${bold ? "font-semibold" : ""}`}>
@@ -150,7 +148,7 @@ export default async function FilingDetailPage({
             </div>
           </div>
 
-          {filing.month !== null && (
+          {!isAnnualPeriod(filing.month) && (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" asChild>
                 <a href={`/api/export/form120?year=${filing.year}&month=${filing.month}`}>

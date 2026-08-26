@@ -6,6 +6,7 @@ import { getCompanyId } from "@/lib/company";
 import { prisma } from "@/lib/prisma";
 import { saveFile, readFile } from "@/lib/storage";
 import { attachOfficialPdf } from "@/lib/tax/filing";
+import { periodLabel } from "@/lib/tax/filing-period";
 import { audit } from "@/lib/audit";
 import { linkExistingFile } from "@/lib/documents";
 
@@ -45,10 +46,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "too_large" }, { status: 413 });
   }
 
-  const period =
-    filing.month === null
-      ? String(filing.year)
-      : `${filing.year}-${String(filing.month).padStart(2, "0")}`;
+  const period = periodLabel(filing.year, filing.month);
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const buffer = Buffer.from(await file.arrayBuffer());
   const stored = await saveFile("filings", `dnit-${filing.type}-${period}-${stamp}.pdf`, buffer);
@@ -82,10 +80,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   try {
     // readFile refuses anything outside the storage root.
     const buf = await readFile(filing.officialPdfPath);
-    const period =
-      filing.month === null
-        ? String(filing.year)
-        : `${filing.year}-${String(filing.month).padStart(2, "0")}`;
+    const period = periodLabel(filing.year, filing.month);
     return new NextResponse(new Uint8Array(buf), {
       headers: {
         "Content-Type": "application/pdf",

@@ -95,8 +95,10 @@ model TaxFiling {
   type      TaxFilingType
   /// Fiscal year the filing covers.
   year      Int
-  /// Fiscal month for monthly obligations (IVA); null for annual ones (IRP).
-  month     Int?
+  /// Fiscal month for monthly obligations (IVA); `ANNUAL_MONTH` (0) for annual
+  /// ones (IRP). NOT NULL on purpose — see the constraint note below and
+  /// src/lib/tax/filing-period.ts.
+  month     Int
   status    TaxFilingStatus @default(DRAFT)
   /// From the SET perpetual calendar (src/lib/tax/calendar.ts).
   dueDate   DateTime
@@ -116,11 +118,13 @@ model TaxFiling {
 
   company Company @relation(fields: [companyId], references: [id])
 
-  // Postgres treats NULLs as distinct, so this constraint does not dedupe
-  // annual (month IS NULL) filings. Harmless today — only IVA is written —
-  // but IRP in Phase 7 must either use a partial unique index or a sentinel
-  // month. Noted rather than solved here: a partial index is not expressible
-  // in the Prisma schema and would show up as drift in CI's migrate diff.
+  // Dedupes monthly AND annual filings, because `month` is NOT NULL: annual
+  // obligations store 0 (`ANNUAL_MONTH`) rather than NULL. Postgres treats
+  // NULLs as distinct, so while the column was nullable this constraint let
+  // two IRP returns for the same year both insert. The alternatives — a
+  // partial unique index, or `NULLS NOT DISTINCT` — are neither expressible
+  // in the Prisma schema nor visible to `prisma migrate diff`, so CI could
+  // not guard them. See src/lib/tax/filing-period.ts.
   @@unique([companyId, type, year, month])
   @@index([companyId, dueDate])
   @@index([companyId, status])
