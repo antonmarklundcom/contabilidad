@@ -351,7 +351,27 @@
         "sifen_unreachable": "We could not reach SIFEN: {detail}"
       },
       "failed": "The query could not be completed."
-    }
+    },
+    "import_tab": {
+      "spreadsheet": "Marangatú spreadsheet",
+      "xml": "e-Kuatiá XML"
+    },
+    "xmlHint": "Upload the XML of the electronic documents issued to you (you download them from Marangatú). We validate the CDC and, if you already captured the expense from a photo, we merge them instead of duplicating.",
+    "xmlFile": "Drag the .xml files here, or click to choose them",
+    "xmlSubmit": "Import XML",
+    "xmlResult": "{created} new · {merged} merged with expenses already captured · {skipped} already imported · {conflicts} with differences · {foreign} for another RUC · {errors} failed",
+    "xmlErrorTitle": "Files we could not import",
+    "xmlError": {
+      "not_xml": "Not valid XML.",
+      "no_de": "The file contains no electronic document (DE).",
+      "no_cdc": "The document has no CDC.",
+      "cdc_invalid": "The CDC is not valid: its check digit does not add up.",
+      "cdc_mismatch": "The document's contents disagree with its own CDC.",
+      "missing_fields": "The document is missing required data (issuer, number or date).",
+      "bad_type": "Unsupported file type.",
+      "too_large": "The file is too large."
+    },
+    "conflictsHint": "Some electronic documents disagree on the amounts with expenses you already confirmed. We did not touch the confirmed figures: a note was left on each expense for you to review."
   },
   "books": {
     "title": "VAT books",

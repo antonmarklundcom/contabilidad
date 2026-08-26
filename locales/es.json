@@ -351,7 +351,27 @@
         "sifen_unreachable": "No pudimos consultar a SIFEN: {detail}"
       },
       "failed": "No se pudo completar la consulta."
-    }
+    },
+    "import_tab": {
+      "spreadsheet": "Planilla de Marangatú",
+      "xml": "XML de e-Kuatiá"
+    },
+    "xmlHint": "Subí los XML de los comprobantes electrónicos que recibiste (los descargás desde Marangatú). Validamos el CDC y, si ya tenías el gasto cargado por foto, los unimos en vez de duplicarlos.",
+    "xmlFile": "Arrastrá los archivos .xml o hacé clic para elegirlos",
+    "xmlSubmit": "Importar XML",
+    "xmlResult": "{created} nuevos · {merged} unidos con gastos ya cargados · {skipped} ya importados · {conflicts} con diferencias · {foreign} de otro RUC · {errors} con error",
+    "xmlErrorTitle": "Archivos que no pudimos importar",
+    "xmlError": {
+      "not_xml": "No es un XML válido.",
+      "no_de": "El archivo no contiene un documento electrónico (DE).",
+      "no_cdc": "El documento no tiene CDC.",
+      "cdc_invalid": "El CDC no es válido: el dígito verificador no cierra.",
+      "cdc_mismatch": "El contenido del documento no coincide con su propio CDC.",
+      "missing_fields": "Al documento le faltan datos necesarios (emisor, número o fecha).",
+      "bad_type": "Tipo de archivo no admitido.",
+      "too_large": "El archivo es demasiado grande."
+    },
+    "conflictsHint": "Hay comprobantes electrónicos cuyos importes no coinciden con gastos que ya confirmaste. No tocamos las cifras confirmadas: quedó una nota en cada gasto para que las revises."
   },
   "books": {
     "title": "Libros IVA",

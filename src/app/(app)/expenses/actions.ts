@@ -198,3 +198,197 @@ export async function importMarangatuRows(
   revalidatePath("/expenses");
   return { created, skipped };
 }
+
+
+/* ── e-Kuatiá DE XML import (PLAN Phase 3.1 + 3.3) ───────────────────────── */
+
+export interface DeImportResult {
+  /** New expenses recorded from a DE with no counterpart in the books. */
+  created: number;
+  /** DEs merged into an expense that was already captured (usually by OCR). */
+  merged: number;
+  /** DEs whose CDC we already hold — a re-import, not a new document. */
+  skipped: number;
+  /**
+   * A DE that disagrees on the amounts with an expense a HUMAN already
+   * confirmed. Never overwritten silently; flagged for someone to look at.
+   */
+  conflicts: number;
+  /** DEs issued to a different RUC — someone else's purchase. */
+  foreign: number;
+}
+
+/**
+ * Finds the expense that IS this document, if we already have it.
+ *
+ * Matched on issuer RUC + document number, deliberately NOT on the amount.
+ * `findDuplicate` includes the total because two captures of the same
+ * comprobante should agree; here the whole point is that they may not — an
+ * OCR read of a creased receipt gets the total wrong, and matching on it
+ * would miss the twin and book the purchase twice. A given issuer cannot
+ * reuse a number, so RUC + número is the document's identity.
+ */
+async function findDeTwin(
+  companyId: string,
+  supplierRuc: string,
+  numeroComprobante: string
+): Promise<string | null> {
+  const twin = await prisma.expense.findFirst({
+    where: { companyId, supplierRuc, numeroComprobante },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  return twin?.id ?? null;
+}
+
+/**
+ * Records downloaded e-Kuatiá documents as expenses, merging with what we
+ * already have rather than duplicating it.
+ *
+ * The XML is the highest-fidelity source we can get for a received document,
+ * so where it meets an OCR capture the electronic figures win — **unless a
+ * human already confirmed that expense**, in which case the amounts are left
+ * exactly as signed off and the disagreement is reported instead. A reviewed
+ * figure is not something an import gets to rewrite; see PLAN Phase 5.10 for
+ * the same rule one level up.
+ *
+ * Importing an XML is NOT the same as verifying it: the CDC is stored so the
+ * Phase 5.8 consulta is one click away, but no verdict is claimed, because
+ * nobody asked SIFEN.
+ */
+export async function importDeDocuments(
+  documents: import("@/lib/ekuatia-xml").ParsedDe[]
+): Promise<DeImportResult> {
+  const empty: DeImportResult = { created: 0, merged: 0, skipped: 0, conflicts: 0, foreign: 0 };
+  if (!(await allowed("expenses:write"))) return empty;
+  const companyId = await getCompanyId();
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { ruc: true, dv: true },
+  });
+  const { isIssuedTo } = await import("@/lib/ekuatia-xml");
+
+  const result = { ...empty };
+
+  for (const de of documents) {
+    if (company && !isIssuedTo(de, company.ruc)) {
+      result.foreign++;
+      continue;
+    }
+
+    // Idempotent: the same file dropped twice is one document, not two.
+    const already = await prisma.expense.findFirst({
+      where: { companyId, cdc: de.cdc },
+      select: { id: true },
+    });
+    if (already) {
+      result.skipped++;
+      continue;
+    }
+
+    const twinId = await findDeTwin(companyId, de.supplierRuc, de.numeroComprobante);
+    const amounts = {
+      gravada10: de.gravada10,
+      gravada5: de.gravada5,
+      exenta: de.exenta,
+      iva10: de.iva10,
+      iva5: de.iva5,
+      total: de.total,
+      moneda: de.moneda,
+      fecha: de.fecha,
+    };
+
+    if (twinId) {
+      const twin = await prisma.expense.findUniqueOrThrow({ where: { id: twinId } });
+      const differs = Number(twin.total) !== de.total;
+      const reviewed = twin.status === "CONFIRMED";
+
+      if (differs && reviewed) {
+        // Enrich the empty fields, never the declared figures.
+        await prisma.expense.update({
+          where: { id: twin.id },
+          data: {
+            cdc: de.cdc,
+            timbrado: twin.timbrado ?? de.timbrado,
+            supplierRazonSocial: twin.supplierRazonSocial ?? de.supplierRazonSocial,
+            notes: [
+              twin.notes,
+              `DE electrónico ${de.cdc}: total ${de.total} ${de.moneda} (registrado ${Number(twin.total)}).`,
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          },
+        });
+        result.conflicts++;
+        continue;
+      }
+
+      await prisma.expense.update({
+        where: { id: twin.id },
+        data: {
+          ...amounts,
+          cdc: de.cdc,
+          source: "IMPORT",
+          timbrado: de.timbrado ?? twin.timbrado,
+          supplierDv: de.supplierDv,
+          supplierRazonSocial: de.supplierRazonSocial || twin.supplierRazonSocial,
+          tipoComprobante: de.tipoComprobante,
+          // The electronic lines replace an OCR guess at them; the human's
+          // category and notes on the expense are left alone.
+          ...(de.items.length > 0
+            ? {
+                items: {
+                  deleteMany: {},
+                  create: de.items.map((item, i) => ({
+                    orden: i + 1,
+                    descripcion: item.descripcion,
+                    cantidad: item.cantidad ?? undefined,
+                    total: item.total,
+                    tasa: item.tasa,
+                    deduciblePercent: 100,
+                  })),
+                },
+              }
+            : {}),
+        },
+      });
+      result.merged++;
+      continue;
+    }
+
+    const suggestedCategory = await categoryForSupplier(de.supplierRuc);
+    await prisma.expense.create({
+      data: {
+        companyId,
+        source: "IMPORT",
+        // Electronic and structured, but still a human's call whether it is
+        // deductible and to which category — same stance as OCR intake.
+        status: "NEEDS_REVIEW",
+        supplierRuc: de.supplierRuc,
+        supplierDv: de.supplierDv,
+        supplierRazonSocial: de.supplierRazonSocial,
+        timbrado: de.timbrado,
+        tipoComprobante: de.tipoComprobante,
+        numeroComprobante: de.numeroComprobante,
+        cdc: de.cdc,
+        categoryId: suggestedCategory,
+        ...amounts,
+        items: {
+          create: de.items.map((item, i) => ({
+            orden: i + 1,
+            descripcion: item.descripcion,
+            cantidad: item.cantidad ?? undefined,
+            total: item.total,
+            tasa: item.tasa,
+            deduciblePercent: 100,
+          })),
+        },
+      },
+    });
+    result.created++;
+  }
+
+  await audit("create", "expense_import_xml", undefined, { ...result });
+  revalidatePath("/expenses");
+  return result;
+}
