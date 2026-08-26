@@ -143,6 +143,23 @@ export const filingNotesSchema = z.object({
   notes: z.string().trim().max(2000),
 });
 
+/**
+ * A pasted CDC to verify (PLAN Phase 5.8).
+ *
+ * Spaces and hyphens are stripped rather than rejected — people paste from
+ * KuDEs and emails, and refusing a valid CDC over whitespace teaches nothing.
+ * The real check is the módulo-11 digit, in `comprobante-check.ts`.
+ */
+export const cdcCheckSchema = z.object({
+  cdc: z
+    .string()
+    .trim()
+    .max(80)
+    .transform((v) => v.replace(/[\s-]/g, "")),
+  /** Optional: cross-check against this captured expense. */
+  expenseId: z.string().trim().max(64).optional().or(z.literal("")),
+});
+
 /** Which IRP regime the taxpayer is in. Explicit — never inferred. */
 export const irpRegimeSchema = z.object({
   regime: z.enum(["RSP", "RGC"]),
@@ -217,3 +234,4 @@ export type InvoiceLinkRedeemInput = z.infer<typeof invoiceLinkRedeemSchema>;
 export type InvoiceLinkCreateInput = z.infer<typeof invoiceLinkCreateSchema>;
 export type IrpRegimeInput = z.infer<typeof irpRegimeSchema>;
 export type IrpYearInput = z.infer<typeof irpYearSchema>;
+export type CdcCheckInput = z.infer<typeof cdcCheckSchema>;

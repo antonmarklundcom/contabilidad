@@ -316,7 +316,42 @@
     "importHint": "Subí el CSV/XLSX de comprobantes electrónicos y virtuales exportado desde Marangatu (ítem 'Consulta de comprobantes'). Se detectan duplicados automáticamente por RUC + número + fecha + total.",
     "importFile": "Archivo CSV o XLSX",
     "importSubmit": "Importar",
-    "importResult": "{created} gastos creados, {skipped} duplicados omitidos, {errors} filas con error"
+    "importResult": "{created} gastos creados, {skipped} duplicados omitidos, {errors} filas con error",
+    "cdcCheck": {
+      "title": "Verificar comprobante con la DNIT",
+      "hint": "Pegá el CDC (44 dígitos) del comprobante electrónico que recibiste. Lo validamos localmente y después le preguntamos a SIFEN si el documento existe y está aprobado.",
+      "cdc": "CDC",
+      "verify": "Verificar",
+      "verifying": "Consultando...",
+      "verifiedAt": "Verificado el {date} por {user}",
+      "verdict": {
+        "verified": "Verificado: SIFEN confirma el documento y coincide con lo cargado.",
+        "rejected": "Rechazado: este documento no es válido según SIFEN.",
+        "mismatch": "No coincide: el documento existe, pero no es el que está cargado acá.",
+        "unknown": "Sin respuesta: no pudimos confirmarlo con SIFEN."
+      },
+      "verdictShort": {
+        "verified": "Verificado",
+        "rejected": "Rechazado",
+        "mismatch": "No coincide",
+        "unknown": "Sin confirmar"
+      },
+      "finding": {
+        "cdc_empty": "Ingresá un CDC.",
+        "cdc_bad_length": "El CDC debe tener 44 dígitos (ingresaste {length}).",
+        "cdc_bad_check_digit": "El dígito verificador del CDC no cierra: revisá si falta o sobra un número.",
+        "cdc_wellformed": "CDC bien formado — emisor {ruc}, comprobante {numero}, fecha {fecha}.",
+        "matches_expense": "Coincide con el gasto cargado ({checks} datos verificados).",
+        "ruc_mismatch": "El RUC del emisor no coincide: cargado {captured}, en el CDC {cdc}.",
+        "numero_mismatch": "El número de comprobante no coincide: cargado {captured}, en el CDC {cdc}.",
+        "fecha_mismatch": "La fecha no coincide: cargada {captured}, en el CDC {cdc} (el CDC lleva la fecha de emisión).",
+        "tipo_mismatch": "El tipo de comprobante no coincide.",
+        "sifen_approved": "SIFEN responde: {estado} ({code}) — {message}",
+        "sifen_not_approved": "SIFEN responde: {estado} ({code}) — {message}",
+        "sifen_unreachable": "No pudimos consultar a SIFEN: {detail}"
+      },
+      "failed": "No se pudo completar la consulta."
+    }
   },
   "books": {
     "title": "Libros IVA",

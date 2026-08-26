@@ -5,6 +5,7 @@ import { getT } from "@/lib/i18n-server";
 import { PageHeader } from "@/components/page-header";
 import { ExpenseForm } from "../expense-form";
 import { loadCategories } from "../category-options";
+import { CdcCheckPanel } from "../cdc-check-panel";
 
 export default async function ExpenseReviewPage({
   params,
@@ -63,6 +64,13 @@ export default async function ExpenseReviewPage({
         confidences={confidences}
         fileUrl={expense.filePath ? `/api/expenses/${expense.id}/file` : null}
         fileMime={expense.fileMime}
+      />
+      <CdcCheckPanel
+        expenseId={expense.id}
+        initialCdc={expense.cdc}
+        initialVerdict={expense.cdcVerdict}
+        verifiedAt={expense.cdcVerifiedAt?.toISOString() ?? null}
+        verifiedBy={expense.cdcVerifiedBy}
       />
     </div>
   );
