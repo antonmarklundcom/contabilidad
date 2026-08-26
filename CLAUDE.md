@@ -77,11 +77,38 @@ so it is testable without a request (`tests/host-routing.test.ts`).
   `Disallow: /` on every host; it is deleted. Marketing → allow + sitemap
   pointer; app host → disallow all (and no sitemap at all).
 - Marketing pages are Server Components with no session and no
-  `getCompanyId()` — there is no company context on the apex. Copy lives in
-  `src/lib/marketing.ts`, deliberately outside `locales/*.json`. The pages are
-  **placeholders**: real copy, OG images and the contact form are a separate
-  task. JSON-LD is an `AccountingService` stub with no address, phone or
-  rating — inventing those would be the fabrication the project refuses.
+  `getCompanyId()` — there is no company context on the apex. Content lives in
+  `src/lib/marketing/`, deliberately outside `locales/*.json`: `firm.ts` (the
+  firm's own facts), `services.ts` (seven services), `guides.ts` (the
+  `/recursos` explainers), `pages.ts` (every public URL, which the sitemap and
+  the nav both read) and `seo.ts` (metadata + JSON-LD builders). Pages:
+  home, `/servicios` + `/servicios/[slug]`, `/portal-clientes`,
+  `/honorarios`, `/sobre-nosotros`, `/contacto`, `/recursos` +
+  `/recursos/[slug]`, `/privacidad`.
+- **`firm.ts` is the anti-fabrication boundary.** Name, RUC, WhatsApp, phone,
+  email, address, matrícula and founding year live there and nowhere else; a
+  field that is still `null` is *omitted* from the page and from the JSON-LD,
+  never filled with a plausible placeholder. `organizationJsonLd()` degrades
+  from `AccountingService` to `Organization` when there is no address, because
+  a LocalBusiness without a location is a claim we cannot support.
+  `tests/marketing-site.test.ts` asserts all of this, plus that no rating,
+  review or client count can ever appear.
+- Copy is Paraguayan Spanish (voseo) and follows STRATEGY.md's refusals: no
+  testimonials, no accuracy claim, no promise to file inside Marangatú, no
+  credential custody. Demo figures are labelled "Ejemplo".
+- The site ships **zero JavaScript of its own** except the contact form: the
+  mobile menu and the FAQs are `<details>`. The visual system is scoped to
+  `[data-site="marketing"]` in `globals.css`, so the app's palette and the
+  site's cannot collide.
+- The contact form is the only session-less **write** path besides `/e/`:
+  `submitLeadAction` has no `allowed()` check (no session to check), so
+  `tests/roles.test.ts` swaps the guarantee — it must call `rateLimitLead()`
+  and must never import Prisma or `getCompanyId`. It emails via
+  `sendPlainEmail` and creates no row; a lead is never a `Client`/`Company`.
+  With no SMTP (or no `FIRM.email`) the form is replaced by direct contact
+  options rather than accepting a message into nowhere.
+- The root layout renders marketing under `lang="es-PY"` with no
+  `I18nProvider` — the apex must not inherit an `en` cookie from the app.
 - DNS and the Hostinger apex move are the owner's call (PLAN 9.5/9.6); nothing
   in the code assumes either has happened.
 

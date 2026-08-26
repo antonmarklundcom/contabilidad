@@ -99,3 +99,165 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Marketing site (PLAN Phase 9.3)
+
+   The public site is a different brand surface from the application: it is
+   read by strangers on a phone, not by an operator who logs in daily. It gets
+   its own scale, its own palette and its own restraint, scoped to
+   [data-site="marketing"] so nothing here can leak into the app's chrome.
+
+   One accent, reserved for calls to action and the few things that must be
+   noticed. Everything else is ink on paper.
+   ───────────────────────────────────────────────────────────────────────── */
+[data-site="marketing"] {
+  --m-paper: oklch(0.995 0.003 95);
+  --m-surface: oklch(1 0 0);
+  --m-raise: oklch(0.975 0.006 95);
+  --m-ink: oklch(0.24 0.02 235);
+  --m-ink-soft: oklch(0.44 0.02 235);
+  --m-muted: oklch(0.55 0.015 235);
+  --m-line: oklch(0.9 0.008 235);
+  --m-accent: oklch(0.48 0.1 178);
+  --m-accent-ink: oklch(0.36 0.09 178);
+  --m-accent-wash: oklch(0.965 0.021 178);
+  --m-deep: oklch(0.26 0.035 200);
+
+  background: var(--m-paper);
+  color: var(--m-ink);
+  font-synthesis-weight: none;
+  text-rendering: optimizeLegibility;
+}
+
+[data-site="marketing"] ::selection {
+  background: var(--m-accent-wash);
+  color: var(--m-accent-ink);
+}
+
+/* Type scale — roughly 1.25, fluid between phone and desktop. */
+[data-site="marketing"] .m-display {
+  font-size: clamp(2.25rem, 1.4rem + 3.6vw, 4rem);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  text-wrap: balance;
+}
+[data-site="marketing"] .m-h2 {
+  font-size: clamp(1.6rem, 1.2rem + 1.7vw, 2.4rem);
+  line-height: 1.12;
+  letter-spacing: -0.022em;
+  font-weight: 600;
+  text-wrap: balance;
+}
+[data-site="marketing"] .m-h3 {
+  font-size: clamp(1.15rem, 1rem + 0.6vw, 1.4rem);
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+  font-weight: 600;
+}
+[data-site="marketing"] .m-lead {
+  font-size: clamp(1.05rem, 0.98rem + 0.45vw, 1.3rem);
+  line-height: 1.55;
+  color: var(--m-ink-soft);
+  text-wrap: pretty;
+}
+[data-site="marketing"] .m-eyebrow {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--m-accent-ink);
+}
+
+/* Buttons — one solid accent action per view, everything else quiet. */
+[data-site="marketing"] .m-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.875rem;
+  padding: 0 1.25rem;
+  border-radius: 0.625rem;
+  font-weight: 550;
+  font-size: 0.975rem;
+  border: 1px solid transparent;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+[data-site="marketing"] .m-btn-primary {
+  background: var(--m-accent);
+  color: oklch(0.99 0 0);
+}
+[data-site="marketing"] .m-btn-primary:hover {
+  background: var(--m-accent-ink);
+}
+[data-site="marketing"] .m-btn-ghost {
+  border-color: var(--m-line);
+  background: var(--m-surface);
+  color: var(--m-ink);
+}
+[data-site="marketing"] .m-btn-ghost:hover {
+  border-color: var(--m-accent);
+  color: var(--m-accent-ink);
+}
+[data-site="marketing"] a:focus-visible,
+[data-site="marketing"] button:focus-visible,
+[data-site="marketing"] input:focus-visible,
+[data-site="marketing"] textarea:focus-visible,
+[data-site="marketing"] select:focus-visible,
+[data-site="marketing"] summary:focus-visible {
+  outline: 2px solid var(--m-accent);
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+/* Cards and rules */
+[data-site="marketing"] .m-card {
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  border-radius: 0.875rem;
+}
+[data-site="marketing"] .m-card-link:hover {
+  border-color: var(--m-accent);
+}
+[data-site="marketing"] .m-rule {
+  border-top: 1px solid var(--m-line);
+}
+
+/* Prose lists with a drawn marker rather than a bullet glyph. */
+[data-site="marketing"] .m-ticks li {
+  position: relative;
+  padding-left: 1.6rem;
+  line-height: 1.55;
+}
+[data-site="marketing"] .m-ticks li::before {
+  content: "";
+  position: absolute;
+  left: 0.15rem;
+  top: 0.55em;
+  width: 0.55rem;
+  height: 0.3rem;
+  border-left: 2px solid var(--m-accent);
+  border-bottom: 2px solid var(--m-accent);
+  transform: translateY(-50%) rotate(-45deg);
+}
+
+/* One motion, and only for people who want it. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-site="marketing"] .m-rise {
+    animation: m-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+@keyframes m-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.6rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

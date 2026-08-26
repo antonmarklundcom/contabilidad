@@ -1,36 +1,76 @@
 import type { Metadata } from "next";
-import { accountingServiceJsonLd, canonicalUrl, FIRM } from "@/lib/marketing";
+import Link from "next/link";
+import {
+  SERVICES,
+  breadcrumbJsonLd,
+  pageMetadata,
+  servicePath,
+} from "@/lib/marketing";
 import { JsonLd } from "../json-ld";
+import { ClosingCta, Section, TickList } from "../_components/ui";
 
-/** TODO(copy): title, description and body come from the marketing copy task. */
-const PAGE = {
+export const metadata: Metadata = pageMetadata({
   path: "/servicios",
-  name: "Servicios",
-  description: "Servicios contables e impositivos.",
-};
+  title: "Servicios contables e impositivos",
+  description:
+    "Facturación electrónica SIFEN, libros de IVA, Formulario 120, IRP, contabilidad mensual y conciliación de comprobantes. Cada servicio se puede contratar solo.",
+});
 
-export async function generateMetadata(): Promise<Metadata> {
-  return {
-    title: PAGE.name,
-    description: PAGE.description,
-    alternates: { canonical: canonicalUrl(PAGE.path) },
-    openGraph: {
-      type: "website",
-      siteName: FIRM.name,
-      title: PAGE.name,
-      description: PAGE.description,
-      url: canonicalUrl(PAGE.path),
-      locale: "es_PY",
-    },
-  };
-}
-
-export default function Page() {
+export default function ServiciosPage() {
   return (
     <>
-      <JsonLd data={accountingServiceJsonLd(PAGE)} />
-      <h1 className="text-3xl font-semibold">Servicios</h1>
-      {/* Placeholder. The copy is a separate task (PLAN Phase 9, "Not in scope"). */}
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Inicio", path: "/" },
+          { name: "Servicios", path: "/servicios" },
+        ])}
+      />
+
+      <Section tone="paper" className="pt-14 sm:pt-20">
+        <div className="max-w-3xl">
+          <p className="m-eyebrow mb-3">Servicios</p>
+          <h1 className="m-display">
+            Todo lo que va del comprobante a la declaración
+          </h1>
+          <p className="m-lead mt-6">
+            Podés contratar el trabajo mensual completo o un encargo puntual:
+            poner los libros al día, ordenar la emisión electrónica o revisar un
+            período antes de que lo revise DNIT.
+          </p>
+        </div>
+      </Section>
+
+      <Section tone="surface">
+        <div className="grid gap-4">
+          {SERVICES.map((service) => (
+            <Link
+              key={service.slug}
+              href={servicePath(service.slug)}
+              className="m-card m-card-link grid gap-6 p-7 sm:grid-cols-[1.1fr_0.9fr] sm:p-8"
+            >
+              <div>
+                <h2 className="m-h3">{service.title}</h2>
+                <p className="mt-2.5 text-[var(--m-ink-soft)]">
+                  {service.summary}
+                </p>
+                <span className="mt-5 inline-block text-sm font-medium text-[var(--m-accent-ink)]">
+                  Ver el servicio →
+                </span>
+              </div>
+              <TickList
+                className="text-sm"
+                items={service.includes.slice(0, 3)}
+              />
+            </Link>
+          ))}
+        </div>
+      </Section>
+
+      <ClosingCta
+        title="¿No sabés cuál de todos necesitás?"
+        lead="Contanos qué obligaciones tenés y cómo trabajás hoy. En una conversación queda claro qué hace falta y qué no."
+        message="Hola, quiero saber qué servicios necesito para mi empresa."
+      />
     </>
   );
 }

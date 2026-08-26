@@ -13,7 +13,7 @@ import {
   siteForHost,
   stripMarketingPrefix,
 } from "@/lib/hosts";
-import { MARKETING_PAGES, canonicalUrl } from "@/lib/marketing";
+import { canonicalUrl } from "@/lib/marketing";
 
 /**
  * PLAN Phase 9.1/9.2 — the marketing/app host split.
@@ -181,12 +181,9 @@ describe("middleware matcher", () => {
 });
 
 describe("marketing pages", () => {
-  it("has a page file for every sitemap entry", () => {
-    for (const page of MARKETING_PAGES) {
-      const dir = page.path === "/" ? "" : page.path;
-      expect(existsSync(path.join(process.cwd(), `src/app/marketing${dir}/page.tsx`))).toBe(true);
-    }
-  });
+  // Route files behind the sitemap — including the dynamic service and guide
+  // segments — are covered in `marketing-site.test.ts`, next to the content
+  // they render.
 
   it("builds absolute canonical URLs without a double slash", () => {
     expect(canonicalUrl("/")).toBe(marketingOrigin());

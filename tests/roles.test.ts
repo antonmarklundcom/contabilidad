@@ -168,6 +168,17 @@ describe("every mutating server action checks a capability", () => {
     ["redeemInvoiceLinkAction", "claimLink("],
   ]);
 
+  /**
+   * Public actions on the marketing site (PLAN Phase 9.3).
+   *
+   * Reachable by anyone, with no session and no token, so there is no
+   * capability to check and nothing to claim. The guarantee is swapped again:
+   * such an action must rate-limit its caller AND must never reach company
+   * data. The second half is asserted separately below — a public endpoint
+   * that can touch Prisma is how a stranger writes into a tenant.
+   */
+  const PUBLIC_ACTIONS = new Map([["submitLeadAction", "rateLimitLead("]]);
+
   it("finds the action files", () => {
     expect(actionFiles.length).toBeGreaterThanOrEqual(6);
   });
@@ -179,6 +190,19 @@ describe("every mutating server action checks a capability", () => {
       for (const chunk of chunks) {
         const name = chunk.slice(0, chunk.indexOf("(")).trim();
         if (READ_ONLY.has(name)) continue;
+
+        const publicCheck = PUBLIC_ACTIONS.get(name);
+        if (publicCheck) {
+          expect(
+            chunk.includes(publicCheck),
+            `${name} in ${file} is public but does not rate-limit the caller`
+          ).toBe(true);
+          expect(
+            /from "@\/lib\/prisma"|getCompanyId/.test(source),
+            `${name} in ${file} is public and must not reach company data`
+          ).toBe(false);
+          continue;
+        }
 
         const tokenCheck = TOKEN_AUTHENTICATED.get(name);
         if (tokenCheck) {
