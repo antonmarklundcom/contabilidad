@@ -50,6 +50,41 @@ KuDE PDF is `src/lib/kude.ts` (pdfkit + `qrcode`). In mock mode it stamps a "SIN
 - **The scope comes off the stored row**, never off the request: company, `tipoDocumento`, expedition point, currency. The anonymous form contributes only the buyer and the lines.
 - `redeemInvoiceLinkAction` is the one exported server action with no `allowed()` check — the token is the capability, minted by someone who held `invoices:emit`. `tests/roles.test.ts` knows about that exemption and asserts it claims a token instead; if you add another session-less action, extend that map rather than the read-only list.
 
+## Host split: marketing vs app (PLAN Phase 9)
+
+One process, one deploy, two sites, decided by the `Host` header in
+`src/middleware.ts`. The decision itself is pure and lives in `src/lib/hosts.ts`
+so it is testable without a request (`tests/host-routing.test.ts`).
+
+- **App hosts** (`sistema.contador.com.py`, localhost, anything in `APP_HOSTS`)
+  get today's `withAuth` behavior unchanged, plus `X-Robots-Tag: noindex`.
+- **Marketing hosts** (`contador.com.py`, `www.`, `MARKETING_HOSTS`) are
+  **rewritten** into `/marketing/...` — a real path segment under
+  `src/app/marketing/`, **not** a route group: `(marketing)/page.tsx` and the
+  existing `(app)/page.tsx` would both resolve to `/` and fail the build.
+- **Fail closed to marketing.** The app allowlist is exact (no suffix
+  matching) and everything else — unknown hosts included — is marketing. On a
+  marketing host *every* path is prefixed, so `/invoices` becomes
+  `/marketing/invoices` and 404s inside the public site instead of reaching an
+  app route unauthenticated. `/marketing/*` asked for directly redirects: to
+  the canonical path on a marketing host, out to `/` on the app host.
+- The self-authenticating paths (`/login`, `/api/auth`, `/api/cron`, `/e/`)
+  are exempted **inside** the middleware, not in the matcher — the host branch
+  has to see them, or the apex would serve the app's login page.
+- `robots.txt` and `sitemap.xml` are host-aware route handlers
+  (`src/app/robots.txt/route.ts`, `src/app/sitemap.xml/route.ts`) and are the
+  only paths excluded from the matcher. The old static `public/robots.txt` was
+  `Disallow: /` on every host; it is deleted. Marketing → allow + sitemap
+  pointer; app host → disallow all (and no sitemap at all).
+- Marketing pages are Server Components with no session and no
+  `getCompanyId()` — there is no company context on the apex. Copy lives in
+  `src/lib/marketing.ts`, deliberately outside `locales/*.json`. The pages are
+  **placeholders**: real copy, OG images and the contact form are a separate
+  task. JSON-LD is an `AccountingService` stub with no address, phone or
+  rating — inventing those would be the fabrication the project refuses.
+- DNS and the Hostinger apex move are the owner's call (PLAN 9.5/9.6); nothing
+  in the code assumes either has happened.
+
 ## Jobs
 
 - `src/lib/jobs/queue.ts` — `enqueueJob()`, exponential backoff.
