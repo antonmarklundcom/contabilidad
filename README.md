@@ -60,6 +60,9 @@ Copy `.env.example` and fill these in:
 | `ENCRYPTION_KEY` | ✅ | `openssl rand -hex 32` (64 hex chars) — encrypts the `.p12` + password at rest |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | optional | email delivery of KuDE + XML |
 | `CRON_SECRET` | ✅ | shared secret for `GET /api/cron` (external cron) |
+| `APP_HOSTS` | optional | extra hostnames that serve the **application** (staging/preview), comma-separated. `sistema.contador.com.py` + localhost are built in |
+| `MARKETING_HOSTS` | optional | extra hostnames that serve the **public site**; unknown hosts already fall back to marketing |
+| `MARKETING_SITE_URL` | optional | `https://contador.com.py` — origin for canonical URLs and `sitemap.xml` |
 | `PORT` | ✅ | server port (`process.env.PORT`) |
 
 ---
