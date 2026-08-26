@@ -112,6 +112,41 @@ export function StatusFilter({ options }: { options: string[] }) {
   );
 }
 
+/**
+ * A one-parameter dropdown filter, for lists that need a second axis beyond
+ * status (the filings archive filters by tax as well). `labelKey` is the
+ * dictionary prefix each option's label is looked up under.
+ */
+export function ParamFilter({
+  param,
+  options,
+  labelKey,
+}: {
+  param: string;
+  options: string[];
+  labelKey: string;
+}) {
+  const { t } = useI18n();
+  const searchParams = useSearchParams();
+  const setParams = useUrlParam();
+  const current = searchParams.get(param) ?? "all";
+  return (
+    <Select value={current} onValueChange={(v) => setParams({ [param]: v === "all" ? null : v })}>
+      <SelectTrigger className="w-[10.5rem]">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">{t("common.all")}</SelectItem>
+        {options.map((o) => (
+          <SelectItem key={o} value={o}>
+            {t(`${labelKey}.${o}`)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export function ExportCsvButton({ endpoint }: { endpoint: string }) {
   const { t } = useI18n();
   const searchParams = useSearchParams();

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/status-badge";
-import { Info, Download, AlertTriangle, CheckCircle2, Archive } from "lucide-react";
+import { Info, Download, AlertTriangle, CheckCircle2, Archive, CalendarRange } from "lucide-react";
 import { DeadlineCard } from "@/components/deadline-card";
 import { SaldoAnteriorForm } from "./saldo-anterior-form";
 import { ClosePeriodForm } from "./close-period-form";
@@ -57,6 +57,11 @@ export default async function TaxesPage({
         title={t("taxes.title")}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/taxes/anual">
+                <CalendarRange /> {t("taxes.irp.navTitle")}
+              </Link>
+            </Button>
             <Button variant="outline" asChild>
               <Link href="/taxes/historial">
                 <Archive /> {t("taxes.history.title")}

@@ -11,6 +11,7 @@ import {
   SearchBox,
   DateRangeFilter,
   StatusFilter,
+  ParamFilter,
   Pagination,
   ExportCsvButton,
 } from "@/components/list-controls";
@@ -28,6 +29,7 @@ import { Archive, FileCheck2 } from "lucide-react";
 
 const PAGE_SIZE = 25;
 const FILING_STATUSES = ["DRAFT", "CLOSED", "SUBMITTED", "PAID"];
+const FILING_TYPES = ["IVA", "IRP"];
 
 export default async function FilingHistoryPage({
   searchParams,
@@ -41,13 +43,16 @@ export default async function FilingHistoryPage({
   const { rows, page, pages } = await listFilings(companyId, {
     q: params.q,
     status: params.status,
+    type: params.type,
     from: params.from,
     to: params.to,
     page: Math.max(1, Number(params.page) || 1),
     pageSize: PAGE_SIZE,
   });
 
-  const hasFilters = Boolean(params.q || params.status || params.from || params.to);
+  const hasFilters = Boolean(
+    params.q || params.status || params.type || params.from || params.to
+  );
   const money = (v: number) => formatMoney(v, "PYG", locale);
 
   return (
@@ -65,6 +70,7 @@ export default async function FilingHistoryPage({
         <SearchBox placeholder={t("taxes.history.searchPlaceholder")} />
         <DateRangeFilter />
         <StatusFilter options={FILING_STATUSES} />
+        <ParamFilter param="type" options={FILING_TYPES} labelKey="taxes.history.typeLabel" />
         <div className="ml-auto">
           <ExportCsvButton endpoint="/api/export/filings" />
         </div>

@@ -92,7 +92,7 @@ const ROUTE_RULES: readonly { pattern: RegExp; capability: Capability }[] = [
   { pattern: /^\/invoices\/[^/]+\/edit(\/|$)/, capability: "invoices:write" },
   { pattern: /^\/taxes(\/|$)/, capability: "taxes:close" },
   { pattern: /^\/api\/filings(\/|$)/, capability: "taxes:close" },
-  { pattern: /^\/api\/export\/(form120|tax-report|filings)(\/|$)/, capability: "taxes:close" },
+  { pattern: /^\/api\/export\/(form120|tax-report|filings|irp)(\/|$)/, capability: "taxes:close" },
 ];
 
 export function routeCapability(pathname: string): Capability | null {

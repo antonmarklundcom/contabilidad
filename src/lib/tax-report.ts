@@ -5,11 +5,15 @@
  *    it is NOT the official form.
  *  - Informe mensual: the full month in one document (ventas, compras,
  *    deducibilidad, posición IVA, gastos por categoría).
+ *  - IRP anual: the fiscal year's income, deducible costs, taxable base and
+ *    the bracket-by-bracket derivation of the tax. Also a "borrador de
+ *    trabajo" — we do not file it.
  * Tax documents are Spanish-only, like the KuDE.
  */
 import PDFDocument from "pdfkit";
 import type { Company } from "@prisma/client";
 import type { Form120Data } from "@/lib/form120";
+import type { IrpData } from "@/lib/irp";
 import type { LibroTotals } from "@/lib/accounting";
 import { formatRuc } from "@/lib/sifen/ruc";
 
@@ -127,8 +131,8 @@ export async function generateForm120Pdf(
   y = sectionTitle(doc, y, "Liquidación");
   y = amountRows(doc, y, [
     ["Débito fiscal", data.ventas.debitoFiscal],
-    ["(−) Crédito fiscal", data.compras.creditoFiscal],
-    ["(−) Saldo a favor del período anterior", data.saldoAnterior],
+    ["(-) Crédito fiscal", data.compras.creditoFiscal],
+    ["(-) Saldo a favor del período anterior", data.saldoAnterior],
     data.aPagar > 0
       ? ["IMPUESTO A PAGAR", data.aPagar, true]
       : ["SALDO A FAVOR PARA EL PERÍODO SIGUIENTE", data.saldoAFavor, true],
@@ -185,7 +189,7 @@ export async function generateMonthlyReportPdf(
   y = amountRows(doc, y, [
     ["Ingresos (ventas aprobadas)", f.ventas.total],
     ["Egresos (compras confirmadas)", f.compras.total],
-    ["Resultado operativo (ingresos − egresos)", f.ventas.total - f.compras.total, true],
+    ["Resultado operativo (ingresos - egresos)", f.ventas.total - f.compras.total, true],
   ]);
 
   y = sectionTitle(doc, y, "Posición IVA");
@@ -241,6 +245,147 @@ export async function generateMonthlyReportPdf(
     doc,
     "Informe generado por FacturaPY con los datos cargados en el sistema. La deducibilidad del IVA de compras " +
       "se decidió ítem por ítem y puede ajustarse en cada gasto. Este informe no sustituye el asesoramiento de un contador." +
+      (mode === "mock" ? " MODO SIMULACIÓN: los datos pueden incluir documentos sin valor fiscal." : "")
+  );
+
+  doc.end();
+  return done;
+}
+
+
+const pct = (v: number) => `${new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 }).format(v * 100)}%`;
+
+/**
+ * IRP annual working draft (PLAN Phase 7).
+ *
+ * Prints the derivation, not just the answer: the tranche table is on the
+ * page so a taxpayer (or their contador) can check the arithmetic instead of
+ * trusting it. Both caveats the module carries — the unverified rate table
+ * and the reused IVA-deducibility decisions — are printed too. A number you
+ * cannot audit is not a number you should sign.
+ */
+export async function generateIrpPdf(
+  company: Company,
+  data: IrpData,
+  mode: string
+): Promise<Buffer> {
+  const { doc, done } = newDoc();
+  const regimeName =
+    data.regime === "RSP"
+      ? "Rentas por servicios personales (RSP)"
+      : "Rentas y ganancias del capital (RGC)";
+  let y = header(doc, company, "IRP — preparación declaración anual", `Ejercicio ${data.year}`);
+
+  doc
+    .font("Helvetica-Oblique")
+    .fontSize(8.5)
+    .fillColor("#a15c00")
+    .text(
+      "BORRADOR DE TRABAJO — no es el formulario oficial. Cargá estos importes en la declaración " +
+        "del IRP dentro de Marangatu.",
+      40,
+      y
+    );
+  y = doc.y + 6;
+  doc.font("Helvetica").fontSize(9).fillColor("#333").text(`Régimen: ${regimeName}`, 40, y);
+  y = doc.y + 10;
+
+  if (data.rules.status === "stub") {
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(8.5)
+      .fillColor("#b00")
+      .text(
+        "RÉGIMEN NO VERIFICADO: las reglas del RGC no fueron confirmadas contra la norma. " +
+          "Estas cifras son una referencia de trabajo y no deben presentarse sin revisión profesional.",
+        40,
+        y,
+        { width: doc.page.width - 80 }
+      );
+    y = doc.y + 10;
+  }
+
+  y = sectionTitle(doc, y, "Rubro 1 — Ingresos del ejercicio");
+  y = amountRows(doc, y, [
+    ["Ingresos gravados al 10% (base sin IVA)", data.ingresos.gravado10],
+    ["Ingresos gravados al 5% (base sin IVA)", data.ingresos.gravado5],
+    ["Ingresos exentos / no gravados", data.ingresos.exentas],
+    ["IVA facturado (no es ingreso — se recauda para el Estado)", data.ingresos.ivaFacturado],
+    ["Total facturado (con IVA)", data.ingresos.totalFacturado],
+    ["RENTA BRUTA", data.ingresos.rentaBruta, true],
+  ]);
+
+  y = sectionTitle(doc, y, "Rubro 2 — Egresos deducibles");
+  y = amountRows(doc, y, [
+    [`Compras al 10% deducibles (${pct(data.egresos.fraccionDeducible10)} de la base)`, data.egresos.deducible10],
+    [`Compras al 5% deducibles (${pct(data.egresos.fraccionDeducible5)} de la base)`, data.egresos.deducible5],
+    ["Compras exentas", data.egresos.deducibleExentas],
+    ["Egresos NO deducibles (excluidos por la revisión ítem por ítem)", data.egresos.egresoNoDeducible],
+    ["IVA de compras no deducible (va al costo)", data.egresos.ivaNoDeducible],
+    ["TOTAL EGRESOS DEDUCIBLES", data.egresos.egresoDeducible, true],
+  ]);
+
+  y = sectionTitle(doc, y, "Liquidación");
+  y = amountRows(doc, y, [
+    ["Renta bruta", data.ingresos.rentaBruta],
+    data.rules.deductsExpenses
+      ? ["(-) Egresos deducibles", data.egresos.egresoDeducible]
+      : ["(-) Egresos deducibles (este régimen no los deduce)", 0],
+    ["RENTA NETA IMPONIBLE", data.rentaNetaImponible, true],
+  ]);
+
+  if (data.noIncidido) {
+    doc
+      .font("Helvetica")
+      .fontSize(9)
+      .fillColor("#333")
+      .text(
+        `Los ingresos brutos del ejercicio no superan ${money(
+          data.rules.incidenceThreshold ?? 0
+        )} Gs., por lo que no corresponde pagar el impuesto. Las obligaciones formales siguen vigentes.`,
+        48,
+        y,
+        { width: doc.page.width - 96 }
+      );
+    y = doc.y + 10;
+  } else if (data.bracketBreakdown.length > 0) {
+    y = sectionTitle(doc, y, "Escala aplicada, tramo por tramo");
+    y = amountRows(
+      doc,
+      y,
+      data.bracketBreakdown.map(
+        (slice) =>
+          [
+            `${money(slice.from)} – ${slice.to === null ? "en adelante" : money(slice.to)} · ` +
+              `${pct(slice.rate)} sobre ${money(slice.base)}`,
+            slice.tax,
+          ] as [string, number]
+      )
+    );
+  }
+
+  y = amountRows(doc, y, [["IMPUESTO DETERMINADO", data.impuesto, true]]);
+
+  doc
+    .font("Helvetica")
+    .fontSize(8.5)
+    .fillColor("#333")
+    .text(
+      `Documentos del ejercicio: ${data.documentCounts.ventas} comprobantes de venta aprobados, ` +
+        `${data.documentCounts.compras} comprobantes de compra confirmados, ` +
+        `en ${data.mesesConMovimiento.length} de 12 meses.`,
+      40,
+      y + 4,
+      { width: doc.page.width - 80 }
+    );
+
+  disclaimer(
+    doc,
+    "Generado por FacturaPY sumando los doce meses del Libro IVA Ventas y del Libro IVA Compras. " +
+      "La proporción deducible proviene de la revisión de deducibilidad del IVA hecha ítem por ítem, " +
+      "que no es el mismo criterio legal que la deducibilidad del IRP: revisá los egresos antes de declarar. " +
+      "La escala de tasas debe verificarse contra la norma vigente. Este documento no sustituye el " +
+      "asesoramiento de un contador." +
       (mode === "mock" ? " MODO SIMULACIÓN: los datos pueden incluir documentos sin valor fiscal." : "")
   );
 
