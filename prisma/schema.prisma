@@ -469,6 +469,16 @@ model Expense {
   // Per-field confidence 0..1 from the OCR model, e.g. { "total": 0.98 }
   confidence         Json?
   duplicateOfId      String?
+  // Verification of a RECEIVED comprobante against SIFEN (PLAN Phase 5.8).
+  // `cdc` is what the user pasted; the rest is the answer we got and when.
+  // Kept as the LAST verdict rather than a history: re-checking is cheap and
+  // a stale "verified" is worth less than a fresh one.
+  cdc                String?
+  cdcVerdict         String?   // verified | rejected | mismatch | unknown
+  cdcEstado          String?   // SIFEN's own estado, verbatim
+  cdcMensaje         String?   @db.Text
+  cdcVerifiedAt      DateTime?
+  cdcVerifiedBy      String?
   notes              String? @db.Text
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
