@@ -12,7 +12,7 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 | 4 | Delivery & polish | Partial — `mailer.ts` exists, no report/reminder jobs |
 | 5 | Compliance calendar & filing archive | **Mostly shipped** — 5.1–5.5 done (PRs #7 #8 #9); 5.6 (reminder/expiry jobs), 5.7 (`send_report` + pre-computed draft), 5.9 (sequence-gap check) and 5.10 (filing status guards) done; 5.8 (paste-a-CDC) still open |
 | 6 | Document vault & client portal roles | **Shipped** — vault, role enforcement, multi-tenant activation |
-| 7 | Annual IRP return | Planned |
+| 7 | Annual IRP return | **Shipped** (`irp.ts`, `/taxes/anual`) — RSP wired; RGC is a declared stub, see Phase 7 note |
 | 8 | Intake channels (WhatsApp, one-time invoice link) | Planned, gated |
 | 9 | Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split | Planned, next (proposed in PR #10, merged; mechanics corrected below) |
 
@@ -125,14 +125,18 @@ Their "Mailbox" screen, minus the physical mail operation. This is what makes th
 
    **Known limits of the activation, for whoever adds the second tenant:** the nightly backup and `/api/settings/backup` dump the whole database and the whole storage root, so a backup is instance-wide, not per-tenant — fine while one operator runs the instance, wrong the moment tenants are separate customers who may download it (the endpoint requires `settings:write`, which no `client` has). There is also no UI for creating a company or assigning users to one: a second tenant is inserted by hand today.
 
-## Phase 7 — Annual income tax return (IRP)
+## Phase 7 — Annual income tax return (IRP) ✅ shipped
 
 The one genuine functional gap: we do IVA only, they file IRP too, and IRP is the reason a residency client keeps a RUC at all.
 
-1. **`src/lib/tax/irp.ts`** — annual aggregation of income and deductible expense categories into the IRP form's rubros, built on the same `libroVentas`/`libroCompras` primitives and the Phase 2 deducibility percentages. Deterministic; fixtures per bracket.
-2. **`/taxes/anual`** — mirrors `/taxes`: year picker, rubro table, discrepancy list, close + sign-off, PDF via `tax-report.ts`.
-3. Reuses Phase 5's `TaxFiling` (`type = IRP`) and calendar for the annual due date — no parallel machinery.
-4. **Scope check before building:** IRP rules vary by taxpayer regime (IRP-RSP vs. IRP-RGC). Confirm which regime our wedge users are in and build that one first; the other stays a stub.
+1. **`src/lib/irp.ts`** — ✅ **shipped**. (Note the path: directly in `src/lib/`, following the shipped Phase 1 layout rather than the `src/lib/tax/` sketch.) Annual aggregation of income and deductible expense into the IRP rubros, built on the same `libroVentas`/`libroCompras` primitives — twelve months read one at a time and folded, so an annual figure is *by construction* the sum of the monthly ones a client already reviewed. `computeIrp` is pure; `buildIrp` does the I/O. Fixtures per bracket in `tests/irp.test.ts`.
+2. **`/taxes/anual`** — ✅ **shipped**. Mirrors `/taxes`: year picker, rubro tables, annual discrepancy list, close + sign-off, PDF via `tax-report.ts` (`generateIrpPdf`, which prints the tranche-by-tranche derivation, not just the answer). Defaults to *last* year, since the current fiscal year is not filable yet. A closed year renders the declared snapshot rather than a live recomputation.
+3. ✅ Reuses Phase 5's `TaxFiling` (`type = IRP`, `month = ANNUAL_MONTH`) and `irpDueDate` — no parallel machinery. `closeFiling`/`reopenFiling` are the existing guards generalised over the tax, so IVA and IRP share one immutability rule rather than growing two. The archive gained a tax filter; its CSV gained IRP columns, blank on IVA rows and vice versa (a blank means "not applicable", a 0 would claim nothing was owed).
+4. **Regime:** ⚠️ **still unanswered, deliberately not guessed.** Neither this document nor STRATEGY says whether the wedge users are IRP-RSP or IRP-RGC, so nothing picked one: `IRP_REGIMES` is a data table and the bracket engine reads it, RSP is wired end to end (`status: "ready"`), and RGC ships as a declared `stub` whose close the server refuses. The regime is stored per company as an explicit choice (`irp.regime` setting) — an unset regime blocks the close rather than defaulting. Answering the question is a one-line table edit.
+
+⚠️ **`IRP_REGIMES` is corroborated, not verified** — same standing caveat as `PERPETUAL_CALENDAR`. The bracket table, the incidence threshold and the deduction rules are attributed to Ley N° 6380/2019 + Decreto N° 3184/2019 and agree across independent secondary sources, but the primary text could not be read: the build environment's egress proxy denies `dnit.gov.py`, `bacn.gov.py` and `impuestospy.com`. Verify against the DNIT/BACN document **before the first production filing**.
+
+⚠️ **The deducible fraction is a proxy.** It is derived from the Phase 2 IVA-deducibility decisions (credited IVA ÷ invoiced IVA, per rate), because that is the only per-expense judgement a human has actually made in this system. "May this purchase's IVA be credited?" is not the same legal test as "is this cost deductible against personal income tax?". The draft says so on screen and in the PDF rather than implying the number is an IRP determination. Exempt purchases carry no IVA and therefore no decision, so they are counted in full and shown on their own line.
 
 ## Phase 8 — Intake channels (gated)
 
@@ -173,7 +177,7 @@ Also still refused, per STRATEGY: portal credential custody, auto-filing to Mara
 | 4 — Delivery | Phases 1–3 | folded into Phase 5 |
 | 5 — Calendar + filing archive | nothing new | calendar module + 1 migration + 1 route + cron wiring |
 | 6 — Vault + roles | Phase 5 (filings feed the vault) | 1 model + 1 route + auth pass over every action |
-| 7 — IRP | Phases 2 and 5 | new math module + 1 route, sized like Phase 1 |
+| 7 — IRP | Phases 2 and 5 | ✅ shipped |
 | 8 — Intake channels | WhatsApp intake: Phase 6 roles (sender→company mapping); the one-time link is no-login by design and needs only the Phase 9 host decision, not roles | link flow small; WhatsApp gated on Meta approval |
 | 9 — Marketing/app domain split | nothing (decision only should predate Phase 8's public link) | middleware host-split + rewrites + route group + DNS move; no shared code with tax/accounting |
 

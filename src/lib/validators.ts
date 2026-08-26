@@ -143,6 +143,16 @@ export const filingNotesSchema = z.object({
   notes: z.string().trim().max(2000),
 });
 
+/** Which IRP regime the taxpayer is in. Explicit — never inferred. */
+export const irpRegimeSchema = z.object({
+  regime: z.enum(["RSP", "RGC"]),
+});
+
+/** A fiscal year for the annual IRP flow. */
+export const irpYearSchema = z.object({
+  year: z.number().int().min(2019).max(2100),
+});
+
 export const documentKindSchema = z.enum([
   "BANK_STATEMENT",
   "DNIT_NOTICE",
@@ -165,3 +175,5 @@ export type DocumentMetaInput = z.infer<typeof documentMetaSchema>;
 
 export type FilingTransitionInput = z.infer<typeof filingTransitionSchema>;
 export type FilingNotesInput = z.infer<typeof filingNotesSchema>;
+export type IrpRegimeInput = z.infer<typeof irpRegimeSchema>;
+export type IrpYearInput = z.infer<typeof irpYearSchema>;

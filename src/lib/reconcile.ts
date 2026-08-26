@@ -5,6 +5,7 @@
  * Marangatú after the fact, we know the moment a document leaves DRAFT.
  */
 import { prisma } from "@/lib/prisma";
+import { ANNUAL_MONTH } from "@/lib/tax/filing-period";
 
 export interface UnresolvedInvoice {
   id: string;
@@ -140,6 +141,7 @@ function makeGap(
 
 export interface ReconciliationData {
   year: number;
+  /** The fiscal month, or `ANNUAL_MONTH` (0) for a whole-year review. */
   month: number;
   /** Invoices dated in the period that never reached APPROVED. */
   unresolvedInvoices: UnresolvedInvoice[];
@@ -162,13 +164,46 @@ function periodRange(year: number, month: number) {
   return { start, end };
 }
 
+function yearRange(year: number) {
+  return { start: new Date(Date.UTC(year, 0, 1)), end: new Date(Date.UTC(year + 1, 0, 1)) };
+}
+
 export async function buildReconciliation(
   companyId: string,
   year: number,
   month: number
 ): Promise<ReconciliationData> {
   const { start, end } = periodRange(year, month);
+  return buildReconciliationForRange(companyId, year, month, start, end);
+}
 
+/**
+ * The same discrepancy list over a whole fiscal year (PLAN Phase 7.2).
+ *
+ * Deliberately the identical checks over a wider window rather than a second
+ * set of annual-only rules: the annual return is a roll-up of the same twelve
+ * months, so anything that would block a monthly close blocks the annual one,
+ * and a client who cleared every month sees a clean annual review for free.
+ *
+ * The sequence-gap window widens with it — `findSequenceGaps` bounds itself by
+ * the numbers the *period* used, so over a year that is the year's own range.
+ * The trailing reserved-but-unused run is still reported once.
+ */
+export async function buildAnnualReconciliation(
+  companyId: string,
+  year: number
+): Promise<ReconciliationData> {
+  const { start, end } = yearRange(year);
+  return buildReconciliationForRange(companyId, year, ANNUAL_MONTH, start, end);
+}
+
+async function buildReconciliationForRange(
+  companyId: string,
+  year: number,
+  month: number,
+  start: Date,
+  end: Date
+): Promise<ReconciliationData> {
   const invoices = await prisma.invoice.findMany({
     where: {
       companyId,

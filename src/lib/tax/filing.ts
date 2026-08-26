@@ -10,9 +10,11 @@
  * quietly rewritten in place.
  */
 import { prisma } from "@/lib/prisma";
-import type { Prisma, TaxFiling, TaxFilingStatus } from "@prisma/client";
+import type { Prisma, TaxFiling, TaxFilingStatus, TaxFilingType } from "@prisma/client";
 import type { Form120Data } from "@/lib/form120";
-import { ivaDueDate } from "@/lib/tax/calendar";
+import type { IrpData } from "@/lib/irp";
+import { irpDueDate, ivaDueDate } from "@/lib/tax/calendar";
+import { ANNUAL_MONTH } from "@/lib/tax/filing-period";
 import { formatRuc } from "@/lib/sifen/ruc";
 import {
   MUTABLE_FILING_STATUSES,
@@ -28,6 +30,7 @@ export {
   canOverwriteSnapshot,
   type FilingStatus,
 } from "@/lib/tax/filing-status";
+export { ANNUAL_MONTH, isAnnualPeriod, periodLabel } from "@/lib/tax/filing-period";
 
 /** Compile-time proof that the client-safe union matches the Prisma enum. */
 const _statusesMatch: FilingStatus extends TaxFilingStatus
@@ -36,6 +39,13 @@ const _statusesMatch: FilingStatus extends TaxFilingStatus
     : never
   : never = true;
 void _statusesMatch;
+
+/**
+ * What a frozen filing carries. One union rather than one table per tax: the
+ * `TaxFiling` row already says which via `type`, and every consumer branches
+ * on that anyway.
+ */
+export type FilingSnapshot = Form120Data | IrpData;
 
 /** Shape the pre-TaxFiling callers expect. Kept stable on purpose. */
 export interface PeriodClose {
@@ -75,15 +85,46 @@ export async function ivaDueDateForCompany(
   return new Date(Date.UTC(fallbackYear, fallbackMonth - 1, 7));
 }
 
+/**
+ * The IRP due date for a fiscal year, from the company's RUC.
+ *
+ * Same fallback reasoning as the IVA one: the earliest day in the perpetual
+ * calendar, because early is safe and a filing row must always have a due
+ * date. IRP falls due in March of the following calendar year.
+ */
+export async function irpDueDateForCompany(companyId: string, year: number): Promise<Date> {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { ruc: true, dv: true },
+  });
+  const due = company ? irpDueDate(formatRuc(company.ruc, company.dv), year) : null;
+  return due ?? new Date(Date.UTC(year + 1, 2, 7));
+}
+
+/** The filing row for any (type, year, month), or null. */
+export function getFilingRecord(
+  companyId: string,
+  type: TaxFilingType,
+  year: number,
+  month: number
+): Promise<TaxFiling | null> {
+  return prisma.taxFiling.findUnique({
+    where: { companyId_type_year_month: { companyId, type, year, month } },
+  });
+}
+
+/** The annual IRP filing row for a fiscal year, or null. */
+export function getAnnualFiling(companyId: string, year: number): Promise<TaxFiling | null> {
+  return getFilingRecord(companyId, "IRP", year, ANNUAL_MONTH);
+}
+
 /** The filing row for a period, or null. */
 export function getFiling(
   companyId: string,
   year: number,
   month: number
 ): Promise<TaxFiling | null> {
-  return prisma.taxFiling.findUnique({
-    where: { companyId_type_year_month: { companyId, type: "IVA", year, month } },
-  });
+  return getFilingRecord(companyId, "IVA", year, month);
 }
 
 /**
@@ -107,6 +148,34 @@ export async function getPeriodClose(
   };
 }
 
+/** `getPeriodClose`'s annual twin: the signed-off IRP return, or null. */
+export interface AnnualClose {
+  closedBy: string;
+  closedAt: string;
+  snapshot: IrpData;
+  status: TaxFilingStatus;
+}
+
+/**
+ * The declared IRP return for a fiscal year, or null when it is not closed.
+ *
+ * DRAFT rows are ignored for the same reason `getPeriodClose` ignores them: a
+ * draft snapshot is a convenience copy, never a declared figure.
+ */
+export async function getAnnualClose(
+  companyId: string,
+  year: number
+): Promise<AnnualClose | null> {
+  const filing = await getAnnualFiling(companyId, year);
+  if (!filing || !filing.closedAt || filing.status === "DRAFT") return null;
+  return {
+    closedBy: filing.closedBy ?? "unknown",
+    closedAt: filing.closedAt.toISOString(),
+    snapshot: filing.snapshot as unknown as IrpData,
+    status: filing.status,
+  };
+}
+
 /**
  * Records human sign-off and freezes the figures as of close time.
  *
@@ -124,10 +193,36 @@ export async function closePeriod(
   snapshot: Form120Data
 ): Promise<ClosePeriodResult> {
   const dueDate = await ivaDueDateForCompany(companyId, year, month);
+  return closeFiling(companyId, { type: "IVA", year, month, dueDate }, closedBy, snapshot);
+}
+
+/** Which filing a close or reopen is about. */
+export interface FilingKey {
+  type: TaxFilingType;
+  year: number;
+  /** `ANNUAL_MONTH` (0) for annual obligations — never null; see filing-period.ts. */
+  month: number;
+}
+
+/**
+ * The guarded close, for any tax.
+ *
+ * `closePeriod` (IVA, monthly) and `closeAnnualFiling` (IRP, yearly) are both
+ * this function with a due date worked out first — the immutability guard,
+ * the atomic status filter and the re-read on contention are written once, so
+ * a second tax cannot arrive with a second, subtly weaker version of them.
+ */
+export async function closeFiling(
+  companyId: string,
+  key: FilingKey & { dueDate: Date },
+  closedBy: string,
+  snapshot: FilingSnapshot
+): Promise<ClosePeriodResult> {
+  const { type, year, month, dueDate } = key;
   const closedAt = new Date();
   const snapshotJson = snapshot as unknown as Prisma.InputJsonValue;
 
-  const existing = await getFiling(companyId, year, month);
+  const existing = await getFilingRecord(companyId, type, year, month);
 
   if (existing) {
     if (!canOverwriteSnapshot(existing.status)) {
@@ -144,7 +239,7 @@ export async function closePeriod(
       },
       data: { status: "CLOSED", dueDate, snapshot: snapshotJson, closedBy, closedAt },
     });
-    const after = await getFiling(companyId, year, month);
+    const after = await getFilingRecord(companyId, type, year, month);
     if (res.count === 0) {
       return { ok: false, reason: "locked", status: after?.status ?? existing.status };
     }
@@ -154,7 +249,7 @@ export async function closePeriod(
   const created = await prisma.taxFiling.create({
     data: {
       companyId,
-      type: "IVA",
+      type,
       year,
       month,
       status: "CLOSED",
@@ -165,6 +260,28 @@ export async function closePeriod(
     },
   });
   return { ok: true, filing: created };
+}
+
+/**
+ * Closes the annual IRP return for a fiscal year.
+ *
+ * The annual row carries `ANNUAL_MONTH`, so the same unique constraint that
+ * dedupes monthly filings dedupes this one — the thing the
+ * `taxfiling_annual_month_sentinel` migration was for.
+ */
+export async function closeAnnualFiling(
+  companyId: string,
+  year: number,
+  closedBy: string,
+  snapshot: IrpData
+): Promise<ClosePeriodResult> {
+  const dueDate = await irpDueDateForCompany(companyId, year);
+  return closeFiling(
+    companyId,
+    { type: "IRP", year, month: ANNUAL_MONTH, dueDate },
+    closedBy,
+    snapshot
+  );
 }
 
 /** Marks a closed filing as presented to DNIT. */
@@ -223,6 +340,8 @@ export async function setFilingNotes(
 export interface FilingListFilters {
   q?: string;
   status?: string;
+  /** `IVA` | `IRP`. Anything else is ignored rather than returning nothing. */
+  type?: string;
   from?: string;
   to?: string;
   page?: number;
@@ -241,6 +360,9 @@ export async function listFilings(companyId: string, filters: FilingListFilters 
   const where: Prisma.TaxFilingWhereInput = {
     companyId,
     ...(filters.status ? { status: filters.status as TaxFilingStatus } : {}),
+    ...(filters.type === "IVA" || filters.type === "IRP"
+      ? { type: filters.type as TaxFilingType }
+      : {}),
     ...(filters.from || filters.to
       ? {
           dueDate: {
@@ -271,6 +393,8 @@ export async function listFilings(companyId: string, filters: FilingListFilters 
   const [rows, count] = await Promise.all([
     prisma.taxFiling.findMany({
       where,
+      // Newest period first; within a year the annual filing (month 0) sorts
+      // last, after the twelve months it rolls up.
       orderBy: [{ year: "desc" }, { month: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -299,17 +423,34 @@ export async function reopenPeriod(
   year: number,
   month: number
 ): Promise<ReopenPeriodResult> {
+  return reopenFiling(companyId, { type: "IVA", year, month });
+}
+
+/** Withdraws the annual IRP filing for a fiscal year. */
+export async function reopenAnnualFiling(
+  companyId: string,
+  year: number
+): Promise<ReopenPeriodResult> {
+  return reopenFiling(companyId, { type: "IRP", year, month: ANNUAL_MONTH });
+}
+
+/** The guarded withdrawal, for any tax. See `reopenPeriod` for the reasoning. */
+export async function reopenFiling(
+  companyId: string,
+  key: FilingKey
+): Promise<ReopenPeriodResult> {
+  const { type, year, month } = key;
   const res = await prisma.taxFiling.deleteMany({
     where: {
       companyId,
-      type: "IVA",
+      type,
       year,
       month,
       status: { in: [...MUTABLE_FILING_STATUSES] },
     },
   });
   if (res.count === 0) {
-    const existing = await getFiling(companyId, year, month);
+    const existing = await getFilingRecord(companyId, type, year, month);
     // Nothing to withdraw is a no-op, not a refusal; a locked row is a refusal.
     if (existing) return { ok: false, reason: "locked", status: existing.status };
   }
