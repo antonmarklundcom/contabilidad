@@ -25,6 +25,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FileText } from "lucide-react";
+import { InvoiceLinkDialog } from "./invoice-link-dialog";
+import { configuredTtlMinutes } from "@/lib/invoice-link";
 
 const PAGE_SIZE = 25;
 const STATUSES = [
@@ -61,14 +63,32 @@ export default async function InvoicesPage({
 
   const hasFilters = Boolean(params.q || params.status || params.from || params.to);
 
+  // The one-time link is pinned to an expedition point at issue time, so the
+  // dialog is only offered once there is one to pin it to.
+  const point = await prisma.expeditionPoint.findFirst({
+    where: { companyId },
+    orderBy: { codigo: "asc" },
+    include: { establishment: { select: { codigo: true } } },
+  });
+  const ttlMinutes = configuredTtlMinutes();
+
   return (
     <div>
       <PageHeader
         title={t("invoices.title")}
         actions={
-          <Button asChild>
-            <Link href="/invoices/new">{t("invoices.new")}</Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {point && (
+              <InvoiceLinkDialog
+                establecimiento={point.establishment.codigo}
+                punto={point.codigo}
+                ttlMinutes={ttlMinutes}
+              />
+            )}
+            <Button asChild>
+              <Link href="/invoices/new">{t("invoices.new")}</Link>
+            </Button>
+          </div>
         }
       />
       <Suspense>

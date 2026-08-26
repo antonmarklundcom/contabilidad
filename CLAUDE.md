@@ -11,7 +11,7 @@ Paraguayan electronic invoicing (SIFEN / DNIT DTE) + automatic accounting, as a 
 - **Next.js 15 App Router + TypeScript**, `output: "standalone"` (Hostinger Node host, port from `$PORT`).
 - **Prisma + PostgreSQL** (schema is MySQL-compatible — only shared features used). Client singleton in `src/lib/prisma.ts`.
 - **Tailwind v4 + hand-written shadcn-style components** in `src/components/ui/` (Radix primitives; no shadcn CLI was used — the registry host is blocked, components were written directly).
-- **NextAuth v4** credentials provider (`src/lib/auth.ts`), JWT sessions, bcrypt. `src/middleware.ts` protects everything except `/login`, `/api/auth`, `/api/cron`, and additionally gates paths by role.
+- **NextAuth v4** credentials provider (`src/lib/auth.ts`), JWT sessions, bcrypt. `src/middleware.ts` protects everything except `/login`, `/api/auth`, `/api/cron`, `/e/*` (the one-time invoice link — see below), and additionally gates paths by role.
 - **Roles**: `src/lib/roles.ts` is the pure capability table (`admin` / `accountant` / `client`; unknown normalises to `client`). Every mutating server action and write API route calls `allowed(capability)` from `src/lib/authz.ts` — the middleware gate is convenience, the action check is the boundary. A structural test fails if a new action forgets.
 - **No Redis / no Docker.** Background work is a DB-backed queue (`JobQueue` table) + an in-process runner + a cron endpoint.
 
@@ -38,6 +38,16 @@ Every SIFEN call is persisted to the `SifenLog` table via `logSifen()` (`log.ts`
 3. `cancelInvoice()` — evento de cancelación, enforces the 48h window (`cancelWindowOpen`).
 
 KuDE PDF is `src/lib/kude.ts` (pdfkit + `qrcode`). In mock mode it stamps a "SIN VALOR FISCAL — SIMULACIÓN" watermark.
+
+## One-time invoice links (`/e/[token]`)
+
+`src/lib/invoice-link.ts` + the `InvoiceLink` model. The only session-less write path in the app, so the rules are strict and non-negotiable:
+
+- **Never store the token** — only `hashLinkToken()` (HMAC-SHA256 under `INVOICE_LINK_SECRET`, falling back to `NEXTAUTH_SECRET`). It is unrecoverable by design; do not add a "show link again" feature, and never put a token in an audit entry or a log.
+- **Expiry is `InvoiceLink.expiresAt` versus the server clock, and nothing else.** The token is opaque — never encode a deadline, a company, or anything else into it.
+- **Claim before emitting.** `claimLink()` flips `usedAt` inside a conditional `updateMany`; the claim is never released. Two DTEs from one link is far worse than one burned link.
+- **The scope comes off the stored row**, never off the request: company, `tipoDocumento`, expedition point, currency. The anonymous form contributes only the buyer and the lines.
+- `redeemInvoiceLinkAction` is the one exported server action with no `allowed()` check — the token is the capability, minted by someone who held `invoices:emit`. `tests/roles.test.ts` knows about that exemption and asserts it claims a token instead; if you add another session-less action, extend that map rather than the read-only list.
 
 ## Jobs
 

@@ -3,8 +3,9 @@ import { withAuth } from "next-auth/middleware";
 import { canOpen, normalizeRole } from "@/lib/roles";
 
 /**
- * Everything is session-protected except /login, the NextAuth routes and
- * /api/cron (which authenticates with its own secret header).
+ * Everything is session-protected except /login, the NextAuth routes,
+ * /api/cron (which authenticates with its own secret header) and `/e/...`
+ * (the one-time invoice link, which authenticates with its own token).
  *
  * On top of the session gate, a role that may not open a path is bounced to
  * the dashboard rather than to /login — it is signed in, just not allowed
@@ -30,6 +31,9 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/((?!login|api/auth|api/cron|_next/static|_next/image|favicon.ico|robots.txt).*)",
+    // `/e/...` is the one-time invoice link (PLAN Phase 8.1): public by
+    // design, with the signed single-use token standing in for the session.
+    // The route verifies it server-side on every request, page and PDF alike.
+    "/((?!login|api/auth|api/cron|e/|_next/static|_next/image|favicon.ico|robots.txt).*)",
   ],
 };

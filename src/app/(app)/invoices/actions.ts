@@ -11,6 +11,10 @@ import { runPendingJobs } from "@/lib/jobs/runner";
 import { audit } from "@/lib/audit";
 import { sendInvoiceEmail, smtpConfigured } from "@/lib/mailer";
 import { allowed } from "@/lib/authz";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { createInvoiceLink } from "@/lib/invoice-link";
+import { invoiceLinkCreateSchema } from "@/lib/validators";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T }
@@ -262,4 +266,58 @@ export async function sendInvoiceEmailAction(
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }
+}
+
+
+/**
+ * Mints a one-time emission link (PLAN Phase 8.1).
+ *
+ * Needs `invoices:emit`, because that is exactly what the link delegates: the
+ * holder emits one invoice for this company with no session of their own. A
+ * `client` role cannot mint one, which is the point of gating it here rather
+ * than at the route.
+ *
+ * The raw token is returned ONCE and never stored — only its keyed HMAC is
+ * (see `src/lib/invoice-link.ts`). We cannot show it again, and the UI says so.
+ */
+export async function createInvoiceLinkAction(
+  input: unknown
+): Promise<ActionResult<{ path: string; expiresAt: string }>> {
+  if (!(await allowed("invoices:emit"))) return { ok: false, error: "forbidden" };
+  const parsed = invoiceLinkCreateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "validation" };
+
+  const companyId = await getCompanyId();
+  // The expedition point must belong to this company — an id from the form
+  // is never trusted to say which company is invoicing.
+  const point = await prisma.expeditionPoint.findFirst({
+    where: {
+      companyId,
+      codigo: parsed.data.punto,
+      establishment: { codigo: parsed.data.establecimiento },
+    },
+  });
+  if (!point) return { ok: false, error: "no_point" };
+
+  const session = await getServerSession(authOptions);
+  const created = await createInvoiceLink({
+    companyId,
+    establecimiento: parsed.data.establecimiento,
+    punto: parsed.data.punto,
+    note: parsed.data.note || null,
+    createdBy: session?.user?.email ?? session?.user?.name ?? null,
+  });
+
+  // The token is deliberately absent from the audit entry: an audit log that
+  // records a live credential is a second copy of it.
+  await audit("create", "invoiceLink", created.link.id, {
+    expiresAt: created.link.expiresAt.toISOString(),
+    establecimiento: created.link.establecimiento,
+    punto: created.link.punto,
+  });
+
+  return {
+    ok: true,
+    data: { path: created.path, expiresAt: created.link.expiresAt.toISOString() },
+  };
 }

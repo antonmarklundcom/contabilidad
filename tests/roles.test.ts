@@ -155,6 +155,19 @@ describe("every mutating server action checks a capability", () => {
     "changePassword",
   ]);
 
+  /**
+   * Actions reachable WITHOUT a session, where `allowed()` has nothing to ask.
+   *
+   * The exemption is not a weakening: these must prove their authority a
+   * different way, and the assertion below is swapped rather than dropped —
+   * each of these has to claim a one-time token, which was minted by someone
+   * who did hold the capability. Keep this list at exactly the actions that
+   * are genuinely session-less; anything else belongs above or with a check.
+   */
+  const TOKEN_AUTHENTICATED = new Map([
+    ["redeemInvoiceLinkAction", "claimLink("],
+  ]);
+
   it("finds the action files", () => {
     expect(actionFiles.length).toBeGreaterThanOrEqual(6);
   });
@@ -166,6 +179,18 @@ describe("every mutating server action checks a capability", () => {
       for (const chunk of chunks) {
         const name = chunk.slice(0, chunk.indexOf("(")).trim();
         if (READ_ONLY.has(name)) continue;
+
+        const tokenCheck = TOKEN_AUTHENTICATED.get(name);
+        if (tokenCheck) {
+          // Same guarantee, different credential: no session to check a
+          // capability against, so it must consume a token instead.
+          expect(
+            chunk.includes(tokenCheck),
+            `${name} in ${file} is session-less but does not claim a token`
+          ).toBe(true);
+          continue;
+        }
+
         expect(
           chunk.includes('allowed("'),
           `${name} in ${file} does not check a capability`

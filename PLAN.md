@@ -13,7 +13,7 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 | 5 | Compliance calendar & filing archive | **Mostly shipped** — 5.1–5.5 done (PRs #7 #8 #9); 5.6 (reminder/expiry jobs), 5.7 (`send_report` + pre-computed draft), 5.9 (sequence-gap check) and 5.10 (filing status guards) done; 5.8 (paste-a-CDC) still open |
 | 6 | Document vault & client portal roles | **Shipped** — vault, role enforcement, multi-tenant activation |
 | 7 | Annual IRP return | **Shipped** (`irp.ts`, `/taxes/anual`) — RSP wired; RGC is a declared stub, see Phase 7 note |
-| 8 | Intake channels (WhatsApp, one-time invoice link) | Planned, gated |
+| 8 | Intake channels (WhatsApp, one-time invoice link) | 8.1 **shipped** (`/e/[token]`); 8.2 (WhatsApp) still gated |
 | 9 | Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split | Planned, next (proposed in PR #10, merged; mechanics corrected below) |
 
 ## Context — competitor A: the AI accountant
@@ -142,7 +142,14 @@ The one genuine functional gap: we do IVA only, they file IRP too, and IRP is th
 
 Lowering the friction of getting a receipt into the books. Both are real product, both have a gate.
 
-1. **One-time invoice link** — signed, short-lived token route (`/e/[token]`) rendering a minimal emission form that calls `emitInvoice()`. No login, no install. Token is single-use, scoped to one company and one document type, `audit()`ed on redemption. Small and genuinely differentiating; build first.
+1. **One-time invoice link** — ✅ **shipped**. `/e/[token]`: a minimal emission form that calls the existing `emitInvoice()` with no login and no install. `src/lib/invoice-link.ts` + the `InvoiceLink` model + the `20260826101035_invoice_link` migration.
+   - **The token is never stored** — only `HMAC-SHA256(token)` under `INVOICE_LINK_SECRET` (falling back to `NEXTAUTH_SECRET`), the password-reset-token pattern. A read of the table yields nothing redeemable; a *write* to it cannot forge a link either, because minting a row for a chosen token needs the key. The raw token exists once, in the URL; the issuing dialog says so rather than letting the operator assume they can come back for it.
+   - **Expiry is server-side only.** It lives in `InvoiceLink.expiresAt` and is compared against the server's clock. The token is opaque randomness carrying no readable payload — the deliberate difference from a self-describing JWT: there is nothing in it for a client to edit and nothing about the deadline the client is trusted to report. TTL is `INVOICE_LINK_TTL_MINUTES`, default 30, **clamped to 5..1440** so a typo cannot mint a month-long link.
+   - **Single use is a claim, not a check**: a conditional `updateMany` flips `usedAt`, so concurrent redemptions produce one winner at the database rather than a race. The claim happens **before** emission — a burned link that emitted nothing is a nuisance, two DTEs from one link would burn two sequence numbers and put a duplicate into SIFEN. Proven by an 8-way concurrent test and end to end against a real Postgres.
+   - **Scope is pinned at issue time**: company, document type (Factura only — a nota de crédito needs an original to reference) and expedition point come off the stored row. The redeemer chooses only the buyer and the lines; a payload trying to name another company or document type is ignored, verified end to end.
+   - Issued from `/invoices` by anyone with `invoices:emit` (so a `client` role cannot mint one), `audit()`ed on both mint and redemption — **without** the token, since an audit log holding a live credential is a second copy of it. `/e/` is excluded from the middleware matcher; `/e/[token]/kude` serves that link's own document and nothing else, so the token cannot be walked into the company's other invoices.
+   - Expiry gates **emission**, not the receipt: a redeemed link keeps showing its document afterwards, since withholding their own copy from the person who created it helps nobody.
+   - `tests/invoice-link.test.ts` covers the token shape and opacity, the key-dependence of the hash, the TTL clamping, expiry against the server clock, single use, and the concurrent double submit. `tests/roles.test.ts` learned about session-less actions: the exemption **swaps** the guarantee (must claim a token) rather than dropping it.
 2. **WhatsApp receipt intake** — WhatsApp Business API webhook → media download → the existing `/api/expenses/upload` OCR pipeline → normal amber-confidence review. **Gate:** requires a Meta Business account, a verified number and per-conversation costs. Evaluate before committing. Until then the honest share flow (Phase 4.2) stands — do not simulate an inbound channel we don't have.
 
 ## Phase 9 — Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split
@@ -178,7 +185,7 @@ Also still refused, per STRATEGY: portal credential custody, auto-filing to Mara
 | 5 — Calendar + filing archive | nothing new | calendar module + 1 migration + 1 route + cron wiring |
 | 6 — Vault + roles | Phase 5 (filings feed the vault) | 1 model + 1 route + auth pass over every action |
 | 7 — IRP | Phases 2 and 5 | ✅ shipped |
-| 8 — Intake channels | WhatsApp intake: Phase 6 roles (sender→company mapping); the one-time link is no-login by design and needs only the Phase 9 host decision, not roles | link flow small; WhatsApp gated on Meta approval |
+| 8 — Intake channels | WhatsApp intake: Phase 6 roles (sender→company mapping); the one-time link is no-login by design and needs only the Phase 9 host decision, not roles | 8.1 ✅ shipped; WhatsApp gated on Meta approval |
 | 9 — Marketing/app domain split | nothing (decision only should predate Phase 8's public link) | middleware host-split + rewrites + route group + DNS move; no shared code with tax/accounting |
 
 Build order within Phase 5: calendar → `TaxFiling` migration → status actions → historial route → deadline card → reminder jobs. The calendar comes first because everything else displays its output.
