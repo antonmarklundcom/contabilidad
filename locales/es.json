@@ -56,7 +56,8 @@
     "logout": "Cerrar sesión",
     "taxes": "Impuestos",
     "documents": "Documentos",
-    "companies": "Empresas"
+    "companies": "Empresas",
+    "queue": "Bandeja de revisión"
   },
   "env": {
     "mock": "SIMULACIÓN",
@@ -777,6 +778,27 @@
       "invalid_role": "Rol inválido.",
       "weak_password": "La contraseña debe tener al menos 10 caracteres.",
       "forbidden": "No tenés permiso para esto."
+    }
+  },
+  "queue": {
+    "title": "Bandeja de revisión",
+    "description": "Todo lo que necesita una persona, en todas tus empresas. El resto ya está listo.",
+    "board": "Estado por cliente",
+    "openItems": "{count} pendientes",
+    "overdue": "IVA {period} vencido",
+    "dueIn": "IVA {period}: vence en {days} días",
+    "noDeadline": "Sin vencimiento calculable",
+    "openTaxes": "Ir a impuestos",
+    "items": "Comprobantes a revisar ({count})",
+    "keys": "j / k para moverte · Enter para abrir",
+    "truncated": "Se muestran los primeros 500; resolvé estos y aparecen los demás.",
+    "empty": "Nada pendiente.",
+    "reasons": {
+      "CDC_MISMATCH": "CDC no coincide",
+      "INACTIVE_SUPPLIER": "Proveedor no activo",
+      "DUPLICATE_SUSPECT": "Posible duplicado",
+      "LOW_CONFIDENCE": "Lectura dudosa",
+      "NEEDS_REVIEW": "Sin revisar"
     }
   }
 }

@@ -37,7 +37,9 @@ export type Capability =
   | "settings:write"
   // PLAN Phase 0.4b — the firm onboarding its clients.
   | "companies:create"
-  | "users:manage";
+  | "users:manage"
+  // PLAN Phase 12 — the cross-client exception queue.
+  | "queue:read";
 
 const CAPABILITIES: Record<Role, readonly Capability[]> = {
   // The owner/operator: everything.
@@ -52,6 +54,7 @@ const CAPABILITIES: Record<Role, readonly Capability[]> = {
     "settings:write",
     "companies:create",
     "users:manage",
+    "queue:read",
   ],
   // The bookkeeper: does the work, but does not reconfigure the company
   // (certificate, timbrado, sequences, SMTP, passwords of others).
@@ -66,6 +69,7 @@ const CAPABILITIES: Record<Role, readonly Capability[]> = {
     // Onboards a new client company (and becomes its member), but does not
     // create logins — that is the admin's call.
     "companies:create",
+    "queue:read",
   ],
   // The client on the portal: reads their own company, and contributes the
   // two things only they have — receipts and documents. No emission, no
@@ -96,6 +100,7 @@ export function capabilitiesOf(role: Role): readonly Capability[] {
 const ROUTE_RULES: readonly { pattern: RegExp; capability: Capability }[] = [
   { pattern: /^\/settings(\/|$)/, capability: "settings:write" },
   { pattern: /^\/companies(\/|$)/, capability: "companies:create" },
+  { pattern: /^\/queue(\/|$)/, capability: "queue:read" },
   { pattern: /^\/api\/settings(\/|$)/, capability: "settings:write" },
   { pattern: /^\/invoices\/new(\/|$)/, capability: "invoices:write" },
   { pattern: /^\/invoices\/[^/]+\/edit(\/|$)/, capability: "invoices:write" },

@@ -1,5 +1,6 @@
 "use client";
 
+import { LOW_CONFIDENCE } from "@/lib/confidence";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/components/i18n-provider";
@@ -31,7 +32,6 @@ export interface ExpenseFormValues extends ExpenseInput {
   id?: string;
 }
 
-const LOW_CONFIDENCE = 0.8;
 
 export function ExpenseForm({
   initial,

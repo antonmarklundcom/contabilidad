@@ -56,7 +56,8 @@
     "logout": "Log out",
     "taxes": "Taxes",
     "documents": "Documents",
-    "companies": "Companies"
+    "companies": "Companies",
+    "queue": "Review queue"
   },
   "env": {
     "mock": "MOCK",
@@ -777,6 +778,27 @@
       "invalid_role": "Invalid role.",
       "weak_password": "Password must be at least 10 characters.",
       "forbidden": "You are not allowed to do this."
+    }
+  },
+  "queue": {
+    "title": "Review queue",
+    "description": "Everything that needs a person, across all your companies. The rest is already done.",
+    "board": "Status by client",
+    "openItems": "{count} open",
+    "overdue": "IVA {period} overdue",
+    "dueIn": "IVA {period}: due in {days} days",
+    "noDeadline": "No computable deadline",
+    "openTaxes": "Go to taxes",
+    "items": "Receipts to review ({count})",
+    "keys": "j / k to move · Enter to open",
+    "truncated": "Showing the first 500; clear these and the rest appear.",
+    "empty": "Nothing pending.",
+    "reasons": {
+      "CDC_MISMATCH": "CDC mismatch",
+      "INACTIVE_SUPPLIER": "Supplier not active",
+      "DUPLICATE_SUSPECT": "Possible duplicate",
+      "LOW_CONFIDENCE": "Low-confidence read",
+      "NEEDS_REVIEW": "Unreviewed"
     }
   }
 }
