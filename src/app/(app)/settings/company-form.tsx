@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GeoSelect } from "./geo-select";
 import { saveCompany } from "./actions";
+import { createCompany } from "../companies/actions";
+import { switchCompany } from "../actions";
 import { calcularDigitoVerificador } from "@/lib/sifen/ruc";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -35,7 +37,17 @@ export interface CompanyValues {
   actividades: { codigo: string; descripcion: string }[];
 }
 
-export function CompanyForm({ initial }: { initial: CompanyValues }) {
+/**
+ * `create` (PLAN Phase 0.4b) onboards a new client company, then switches the
+ * user into it and opens its settings to finish setup.
+ */
+export function CompanyForm({
+  initial,
+  mode = "edit",
+}: {
+  initial: CompanyValues;
+  mode?: "edit" | "create";
+}) {
   const { t } = useI18n();
   const router = useRouter();
   const [v, setV] = useState<CompanyValues>(initial);
@@ -52,6 +64,18 @@ export function CompanyForm({ initial }: { initial: CompanyValues }) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    if (mode === "create") {
+      const created = await createCompany(v);
+      if (!created.ok) {
+        setSaving(false);
+        setError(created.error);
+        return;
+      }
+      await switchCompany(created.id);
+      router.push("/settings");
+      router.refresh();
+      return;
+    }
     const res = await saveCompany(v);
     setSaving(false);
     if (res.ok) {
@@ -65,8 +89,10 @@ export function CompanyForm({ initial }: { initial: CompanyValues }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("settings.company")}</CardTitle>
-        <CardDescription>{t("settings.companyHint")}</CardDescription>
+        <CardTitle>{mode === "create" ? t("companies.new") : t("settings.company")}</CardTitle>
+        <CardDescription>
+          {mode === "create" ? t("companies.newHint") : t("settings.companyHint")}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4">
@@ -215,10 +241,16 @@ export function CompanyForm({ initial }: { initial: CompanyValues }) {
 
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={saving}>
-              {saving ? t("common.saving") : t("common.save")}
+              {saving ? t("common.saving") : mode === "create" ? t("companies.create") : t("common.save")}
             </Button>
             {saved && <span className="text-sm text-emerald-700">{t("settings.savedOk")}</span>}
-            {error && <span className="text-sm text-destructive">{t("common.error")}</span>}
+            {error && (
+              <span className="text-sm text-destructive">
+                {t(`companies.errors.${error}`) !== `companies.errors.${error}`
+                  ? t(`companies.errors.${error}`)
+                  : t("common.error")}
+              </span>
+            )}
           </div>
         </form>
       </CardContent>

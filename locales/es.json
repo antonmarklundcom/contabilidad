@@ -55,7 +55,8 @@
     "settings": "Configuración",
     "logout": "Cerrar sesión",
     "taxes": "Impuestos",
-    "documents": "Documentos"
+    "documents": "Documentos",
+    "companies": "Empresas"
   },
   "env": {
     "mock": "SIMULACIÓN",
@@ -738,5 +739,42 @@
   },
   "company": {
     "switch": "Cambiar de empresa"
+  },
+  "companies": {
+    "title": "Empresas",
+    "description": "Las empresas a las que tenés acceso.",
+    "new": "Nueva empresa",
+    "newHint": "Cargá los datos fiscales del cliente. Después podés completar establecimientos, certificado y demás en Configuración.",
+    "create": "Crear empresa",
+    "searchPlaceholder": "Buscar por razón social o RUC",
+    "members": "Usuarios",
+    "active": "Empresa actual",
+    "open": "Abrir",
+    "addMember": "Agregar usuario",
+    "addMemberHint": "Si el correo ya tiene usuario, solo se le da acceso. Si no, se crea con la contraseña inicial que escribas acá; pasásela de forma segura y pedile que la cambie.",
+    "email": "Correo",
+    "name": "Nombre",
+    "role": "Rol",
+    "initialPassword": "Contraseña inicial (mín. 10 caracteres)",
+    "memberAdded": "Acceso otorgado.",
+    "memberCreated": "Usuario creado con acceso.",
+    "roles": {
+      "client": "Cliente",
+      "accountant": "Contador",
+      "admin": "Administrador"
+    },
+    "errors": {
+      "invalid_ruc": "RUC o DV inválido.",
+      "wrong_dv": "El dígito verificador no corresponde a ese RUC.",
+      "missing_razon_social": "Falta la razón social.",
+      "missing_timbrado": "Timbrado de 8 dígitos y fecha de inicio son obligatorios.",
+      "missing_address": "Completá dirección, departamento, distrito y ciudad.",
+      "duplicate_ruc": "Ya existe una empresa con ese RUC.",
+      "invalid_email": "Correo inválido.",
+      "missing_name": "Falta el nombre.",
+      "invalid_role": "Rol inválido.",
+      "weak_password": "La contraseña debe tener al menos 10 caracteres.",
+      "forbidden": "No tenés permiso para esto."
+    }
   }
 }
