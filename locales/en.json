@@ -468,6 +468,7 @@
     "backupNow": "Download backup now",
     "backupGenerating": "Generating backup...",
     "backupList": "Available backups",
+    "backupOperatorOnly": "This instance serves several companies: the full backup contains all of their data, so only the operator downloads it from the server. The nightly backup is still generated.",
     "language": "Language",
     "spanish": "Español",
     "english": "English",
