@@ -9,12 +9,31 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 | 1 | F.120 draft, reconciliation, `/taxes`, close + sign-off | **Shipped** (`form120.ts`, `reconcile.ts`, `tax-report.ts`); the sequence-gap check followed in 5.9 |
 | 2 | Item-level deducibility | **Shipped** (`deductibility.ts`, `ExpenseItem`) — AI suggests at OCR time; no rules table, see Phase 2 note |
 | 3 | Marangatú import & matching | **Shipped** in full — spreadsheet import (`marangatu-import.ts`) *and* e-Kuatiá XML DE import with CDC validation and OCR-twin merging (`ekuatia-xml.ts`) |
-| 4 | Delivery & polish | Partial — `mailer.ts` exists, no report/reminder jobs |
+| 4 | Delivery & polish | **Folded into Phase 5** — report email + reminders shipped there; WhatsApp auto-send is Phase 8.2 |
 | 5 | Compliance calendar & filing archive | **Shipped** — 5.1–5.10 all done, including 5.8 (paste-a-CDC consulta) |
 | 6 | Document vault & client portal roles | **Shipped** — vault, role enforcement, multi-tenant activation |
 | 7 | Annual IRP return | **Shipped** (`irp.ts`, `/taxes/anual`) — RSP wired; RGC is a declared stub, see Phase 7 note |
 | 8 | Intake channels (WhatsApp, one-time invoice link) | 8.1 **shipped** (`/e/[token]`); 8.2 (WhatsApp) still gated |
-| 9 | Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split | Planned, next (proposed in PR #10, merged; mechanics corrected below) |
+| 9 | Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split | **Code shipped** (`hosts.ts`, host-aware robots/sitemap, `src/app/marketing/` placeholders); DNS move is the owner's call. Real marketing copy lives in the separate `contador` repo (static PHP site) — see Phase 9 note |
+| 0 | **Fix-first hardening** (before any client depends on the numbers) | **Next** — see "Phase 0" below |
+| 10 | DNIT padrón sync + supplier status checks | Planned |
+| 11 | RG 90 libro export in Marangatú's upload format | Planned — gated on a real sample file |
+| 12 | Accountant exception queue across all clients | Planned |
+
+**Direction (2026-09):** the product is an *accountant operating system* first and a DIY tool second. In Paraguay a freelance contador costs ~₲100–150k/month, so a self-service SaaS saves the client almost nothing and removes the person who carries the liability. The margin is in making one accountant handle hundreds of clients: the client sends receipts, the machine books and checks everything, and a human only looks at exceptions. Every phase from 0 onward is judged by "does this cut accountant minutes per client per month without adding risk?". Sold two ways: our own firm (via the `contador.com.py` site) and licensed to other estudios per client. Market figures quoted in planning notes (padrón size, fine amounts, share of PJ RUCs) are secondary-source and unverified — do not put them in UI or marketing copy until checked against DNIT.
+
+## Phase 0 — Fix first (hardening before scale)
+
+The shipped features are broad; these are the places where they can currently produce a *wrong tax figure* or leak between tenants once a second client exists. They come before any new feature because the accountant-OS direction multiplies each of them by the number of clients.
+
+1. **Deducibility has no `PENDING` state (money path).** Items default to 100 % deductible and only AI-suggested *reductions* go amber (Phase 2 note). An unreviewed item therefore silently claims full IVA credit — the exact error SET audits disallow. Fix: add `PENDING` (migration), default OCR/import items to it, exclude `PENDING` from IVA crédito in `form120.ts`, and add "pending deducibility" as a reconciliation finding that **blocks** `clean`. Tests in `deductibility.test.ts` + `form120.test.ts`.
+2. **Owner verification of the two corroborated tables.** `PERPETUAL_CALENDAR` (persisted into `TaxFiling.dueDate`) and `IRP_REGIMES` are secondary-source only. Owner downloads the DNIT resolutions from a normal network and commits them under `docs/sources/`; the table edits cite them. Also answer the IRP regime question (RSP vs RGC) for the first clients. Until done, the deadline card and IRP PDF should carry a visible "fecha/tabla sin verificar" note.
+3. **Per-tenant backup.** `/api/settings/backup` and the nightly job dump the whole DB and storage root (Phase 6 known limit). With many clients on one instance an admin of one company can download every other company's data. Fix: backup export filtered by `companyId` (rows + that company's storage files); the instance-wide dump becomes an operator-only script, not an HTTP endpoint.
+4. **Tenant + user provisioning.** No UI to create a company or assign users — a second tenant is inserted by hand. Needed before the firm onboards clients: an operator/`accountant` screen to create a company (RUC validated with `ruc.ts`), invite users, and a membership model so **one accountant user can belong to many companies** with a company switcher (today `User.companyId` is single-valued). This is the foundation Phase 12 stands on.
+5. ✅ **Stale-doc cleanup** (done with this plan update). CLAUDE.md still warned that `reopenPeriod`/`closePeriod` lack status guards — they shipped in 5.10. Remove the warning so future sessions don't re-implement it. Keep this table in sync when a phase ships.
+6. **DB-backed reconciliation test.** Phase 1 note: the findings list itself is untested against a database. Add one DB test that seeds a period and asserts the findings, since `clean` gates the close.
+
+Exit: all six done, `npm test` + lint green, migrations replay clean in CI.
 
 ## Context — competitor A: the AI accountant
 
@@ -182,6 +201,40 @@ Proposed in PR #10 (merged); this section is that plan with the mechanics correc
 
 **Not in scope:** rewriting the existing static-HTML copy — that's design/copy work for whoever builds the marketing pages; this phase is the routing/hosting seam only.
 
+**Status note:** items 1–4 shipped (`src/lib/hosts.ts`, `tests/host-routing.test.ts`, host-aware `robots.txt`/`sitemap.xml` route handlers, placeholder pages under `src/app/marketing/`). The public firm site is now being built separately as static HTML + PHP in the `contador` repo. Decide before the DNS move whether the apex is served by that PHP site (then delete `src/app/marketing/` and keep only the app host here) or by this app — not both.
+
+## Phase 10 — DNIT padrón sync + supplier status checks
+
+The highest-value missing check: a purchase from a RUC that is `CANCELADO`, `BLOQUEADO` or `SUSPENSIÓN TEMPORAL` is a credit SET can disallow, and today nothing notices.
+
+1. **`DnitPadron` model** (migration): `ruc` (base, no DV) PK, `dv`, `razonSocial`, `estado`, `tipoPersona`, `syncedAt`. Global table, **not** company-scoped — it is public data, the one deliberate exception to the `companyId` rule; document that in CLAUDE.md.
+2. **`src/lib/padron.ts`** — download `ruc0.zip`…`ruc9.zip`, stream-unzip, parse the pipe-delimited rows, bulk upsert in batches (Postgres `COPY` into a staging table + swap if row-by-row is too slow). The DV in the file is re-checked with `ruc.ts`; a mismatch is logged, not trusted. Parser golden-tested on a small fixture cut from a real file (same discipline as `tests/fixtures/marangatu/`). Format is taken from a downloaded file, never assumed.
+3. **`padron_sync` job**, enqueued monthly from `/api/cron`; records the source file dates so the UI can say "padrón al DD/MM".
+4. **Checks**: on OCR, Marangatú and XML import, look up the issuer. Unknown RUC ⇒ warning; inactive estado ⇒ `NEEDS_REVIEW` + a `reconcile.ts` finding that blocks `clean`. Razón social mismatch ⇒ warning only. Also autofill supplier name in the expense form.
+5. **Network gate:** the build environment blocks `dnit.gov.py`. The job must degrade to "padrón no disponible" (no findings, no false alarms) and the owner verifies the first real sync on the Hostinger host.
+
+## Phase 11 — RG 90 libro export (Marangatú upload format)
+
+Today the libros export as CSV/XLSX for humans. The accountant still re-keys or reformats them for Marangatú's RG 90 registro de comprobantes upload.
+
+1. **Gate: a real sample.** Owner exports/downloads the official RG 90 layout (DNIT's specification or a file Marangatú accepted) into `tests/fixtures/rg90/`. The column order, separators, date format and tipo-de-comprobante codes come from that file — do not invent them.
+2. **`src/lib/rg90.ts`** — pure: libro rows → RG 90 lines (ventas, compras; exenta / gravada 5 / gravada 10 buckets, timbrado, número, CDC where electronic). Only confirmed expenses and approved invoices; `PENDING` deducibility (Phase 0.1) is excluded or flagged, never exported silently.
+3. `/api/export/rg90?year&month&libro=` + a button on `/books` and on the `/taxes` close screen. Golden-file tests.
+4. Pre-export validation reuses `reconcile.ts`: refuse (with the findings list) if the period is not clean.
+
+## Phase 12 — Accountant exception queue
+
+The screen that turns "60 minutes per client" into "5". Depends on Phase 0.4 (one accountant ↔ many companies).
+
+1. **`/queue`** (accountant/admin only): one list across every company the user belongs to, of items needing a human — low-confidence OCR fields, `NEEDS_REVIEW` expenses, `PENDING` deducibility, padrón failures (Phase 10), CDC `mismatch`, duplicate suspects, periods with a draft ready to close, and upcoming deadlines. Each row names the company.
+2. **High-density review view:** receipt image beside the parsed fields, amber for low confidence, keyboard driven (j/k next/prev, a approve, e edit, d deducibility). Approving writes through the *same* server actions as the per-company screens (with `allowed()` and `audit()`), just with the company passed explicitly and checked against membership.
+3. **Per-client month status board:** company × month grid (receipts in / exceptions open / draft ready / closed / submitted / paid). This is the firm's daily driver and the demo for licensing to other estudios.
+4. Metric: store review time per item (`audit` timestamps) so "minutes per client" is measured, not claimed.
+
+## Phase 8.2 revisited — WhatsApp intake
+
+Unchanged gate (Meta Business account, verified number, per-conversation cost), but it is now the main client channel for the firm model, so it moves ahead of nice-to-haves once Phase 12 exists. Design notes for when it opens: sender phone → user → membership mapping (Phase 0.4); unknown numbers get a polite refusal and nothing is stored; media goes to `STORAGE_DIR/receipts` through the existing OCR job; the reply confirms what was captured and that a human will review it — never "added to your libro" before review.
+
 ## Explicitly out of scope
 
 Competitor B's service lines — RUC registration in Marangatú, rented address + utility bills, rental contracts, physical mail reception/forwarding, tax residency certificate issuance, apostille and shipping. These are an operations business staffed by humans, not features. If we ever sell them, the software side is already covered: Phase 6's vault delivers the documents and Phase 5's job engine handles renewal reminders. Nothing further to build.
@@ -200,8 +253,13 @@ Also still refused, per STRATEGY: portal credential custody, auto-filing to Mara
 | 6 — Vault + roles | Phase 5 (filings feed the vault) | 1 model + 1 route + auth pass over every action |
 | 7 — IRP | Phases 2 and 5 | ✅ shipped |
 | 8 — Intake channels | WhatsApp intake: Phase 6 roles (sender→company mapping); the one-time link is no-login by design and needs only the Phase 9 host decision, not roles | 8.1 ✅ shipped; WhatsApp gated on Meta approval |
-| 9 — Marketing/app domain split | nothing (decision only should predate Phase 8's public link) | middleware host-split + rewrites + route group + DNS move; no shared code with tax/accounting |
+| 9 — Marketing/app domain split | nothing (decision only should predate Phase 8's public link) | ✅ code shipped; DNS + apex-owner decision open |
+| 0 — Fix first | nothing | 1 migration (PENDING) + backup scoping + membership model/UI + doc/test cleanup |
+| 10 — Padrón | nothing (network access on the host) | 1 model + parser + job + import hooks |
+| 11 — RG 90 export | real sample file from owner; Phase 0.1 | pure formatter + route + golden tests |
+| 12 — Exception queue | Phase 0.4 membership; better with Phase 10 | 1 route + review UI + status board |
+| 8.2 — WhatsApp | Meta approval; Phase 0.4 | webhook + sender mapping |
 
-Build order within Phase 5: calendar → `TaxFiling` migration → status actions → historial route → deadline card → reminder jobs. The calendar comes first because everything else displays its output.
+**Order from here:** 0 → 10 → 12 → 11 (as soon as the sample file arrives, it can jump ahead) → 8.2. Phase 0.1 and 0.3 are the most urgent: one can produce a wrong IVA figure, the other leaks data between tenants.
 
 Tests to keep green throughout: existing money/RUC/CDC/sequence suites, plus new fixtures for f120 math and deductibility rules — these are money-path and get the same "protect the money" treatment as `tests/`.
