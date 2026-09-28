@@ -55,7 +55,8 @@
     "settings": "Settings",
     "logout": "Log out",
     "taxes": "Taxes",
-    "documents": "Documents"
+    "documents": "Documents",
+    "companies": "Companies"
   },
   "env": {
     "mock": "MOCK",
@@ -738,5 +739,42 @@
   },
   "company": {
     "switch": "Switch company"
+  },
+  "companies": {
+    "title": "Companies",
+    "description": "The companies you have access to.",
+    "new": "New company",
+    "newHint": "Enter the client's tax details. You can finish establishments, certificate and the rest in Settings afterwards.",
+    "create": "Create company",
+    "searchPlaceholder": "Search by name or RUC",
+    "members": "Users",
+    "active": "Current company",
+    "open": "Open",
+    "addMember": "Add user",
+    "addMemberHint": "If the email already has a login it just gains access. Otherwise a login is created with the initial password you type here; hand it over securely and ask them to change it.",
+    "email": "Email",
+    "name": "Name",
+    "role": "Role",
+    "initialPassword": "Initial password (min. 10 characters)",
+    "memberAdded": "Access granted.",
+    "memberCreated": "User created with access.",
+    "roles": {
+      "client": "Client",
+      "accountant": "Accountant",
+      "admin": "Administrator"
+    },
+    "errors": {
+      "invalid_ruc": "Invalid RUC or DV.",
+      "wrong_dv": "The check digit does not match that RUC.",
+      "missing_razon_social": "Business name is missing.",
+      "missing_timbrado": "An 8-digit timbrado and its start date are required.",
+      "missing_address": "Fill in address, department, district and city.",
+      "duplicate_ruc": "A company with that RUC already exists.",
+      "invalid_email": "Invalid email.",
+      "missing_name": "Name is missing.",
+      "invalid_role": "Invalid role.",
+      "weak_password": "Password must be at least 10 characters.",
+      "forbidden": "You are not allowed to do this."
+    }
   }
 }

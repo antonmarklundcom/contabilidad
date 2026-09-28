@@ -19,6 +19,7 @@ import {
   Menu,
   X,
   FolderOpen,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { canOpen, type Role } from "@/lib/roles";
@@ -44,6 +45,7 @@ const NAV = [
   { href: "/taxes", key: "nav.taxes", icon: Landmark },
   { href: "/documents", key: "nav.documents", icon: FolderOpen },
   { href: "/reports", key: "nav.reports", icon: BarChart3 },
+  { href: "/companies", key: "nav.companies", icon: Building2 },
   { href: "/settings", key: "nav.settings", icon: Settings },
 ] as const;
 
