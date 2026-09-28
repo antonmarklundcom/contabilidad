@@ -3,7 +3,7 @@ import { getCompanyId } from "@/lib/company";
 import { getT } from "@/lib/i18n-server";
 import { getSifenMode } from "@/lib/sifen";
 import { smtpConfigured } from "@/lib/mailer";
-import { listBackups } from "@/lib/backup";
+import { currentBackupAccess, listBackups } from "@/lib/backup";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CompanyForm, type CompanyValues } from "./company-form";
@@ -37,7 +37,9 @@ export default async function SettingsPage() {
     }))
   );
 
-  const backups = listBackups().map((b) => ({
+  // Multi-tenant: the backup holds every company, so it is not listed here.
+  const backupAccess = await currentBackupAccess();
+  const backups = (backupAccess === "ok" ? listBackups() : []).map((b) => ({
     name: b.name,
     size: b.size,
     createdAt: b.createdAt.toISOString(),
@@ -96,7 +98,7 @@ export default async function SettingsPage() {
           <SmtpPanel configured={smtpConfigured()} />
         </TabsContent>
         <TabsContent value="backup">
-          <BackupPanel backups={backups} />
+          <BackupPanel backups={backups} operatorOnly={backupAccess !== "ok"} />
         </TabsContent>
         <TabsContent value="users">
           <PasswordPanel />

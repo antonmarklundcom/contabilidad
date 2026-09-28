@@ -153,7 +153,7 @@ export async function categoryForSupplier(supplierRuc: string): Promise<string |
   return map?.categoryId ?? null;
 }
 
-/** Bulk-imports pre-parsed Marangatu rows as CONFIRMED expenses (no OCR needed — already structured). */
+/** Bulk-imports pre-parsed Marangatu rows as NEEDS_REVIEW expenses (no OCR needed — already structured; a human still confirms). */
 export async function importMarangatuRows(
   rows: import("@/lib/marangatu-import").MarangatuRow[]
 ): Promise<{ created: number; skipped: number }> {

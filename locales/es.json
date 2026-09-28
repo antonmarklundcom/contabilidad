@@ -468,6 +468,7 @@
     "backupNow": "Descargar respaldo ahora",
     "backupGenerating": "Generando respaldo...",
     "backupList": "Respaldos disponibles",
+    "backupOperatorOnly": "Esta instancia atiende a varias empresas: el respaldo completo incluye datos de todas, así que solo lo descarga el operador desde el servidor. El respaldo nocturno sigue generándose.",
     "language": "Idioma",
     "spanish": "Español",
     "english": "English",

@@ -274,8 +274,11 @@ export function SmtpPanel({ configured }: { configured: boolean }) {
 
 export function BackupPanel({
   backups,
+  operatorOnly,
 }: {
   backups: { name: string; size: number; createdAt: string }[];
+  /** More than one company on this instance: backups are operator-only. */
+  operatorOnly: boolean;
 }) {
   const { t, dateTime } = useI18n();
   const [busy, setBusy] = useState(false);
@@ -293,6 +296,17 @@ export function BackupPanel({
       URL.revokeObjectURL(url);
     }
     setBusy(false);
+  }
+
+  if (operatorOnly) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("settings.backup")}</CardTitle>
+          <CardDescription>{t("settings.backupOperatorOnly")}</CardDescription>
+        </CardHeader>
+      </Card>
+    );
   }
 
   return (

@@ -12,6 +12,25 @@ import { enqueueJob } from "@/lib/jobs/queue";
 
 const KEEP = 14;
 
+/**
+ * A backup is the whole instance: every company's rows, every user's password
+ * hash, every tenant's certificate. It may be handed to a company admin over
+ * HTTP only while that admin's company IS the whole instance. With a second
+ * tenant it becomes an operator artefact (the nightly job still writes it to
+ * STORAGE_DIR/exports; the operator fetches it from the host), because
+ * `settings:write` is a per-company capability and must not reach another
+ * company's data. Pure so both branches are tested (tests/backup-access.test.ts).
+ */
+export type BackupAccess = "ok" | "multi_tenant";
+
+export function instanceBackupAccess(companyCount: number): BackupAccess {
+  return companyCount <= 1 ? "ok" : "multi_tenant";
+}
+
+export async function currentBackupAccess(): Promise<BackupAccess> {
+  return instanceBackupAccess(await prisma.company.count());
+}
+
 export async function createBackup(): Promise<string> {
   const exportsDir = storageDir("exports");
   const stamp = new Date().toISOString().slice(0, 16).replace(/[T:]/g, "-");
