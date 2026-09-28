@@ -677,3 +677,31 @@ model Setting {
 
   @@unique([companyId, key])
 }
+
+// DNIT padrón de contribuyentes (PLAN Phase 10). Public data, so this is the
+// one table WITHOUT companyId — every tenant looks suppliers up in the same
+// registry. `estado` is stored verbatim; only "ACTIVO" is treated as active.
+// It is the supplier's status AS OF `syncedAt`, not on any invoice's date.
+model DnitPadron {
+  ruc         String   @id // base RUC, no DV
+  dv          String
+  razonSocial String
+  estado      String
+  rucAnterior String?
+  syncedAt    DateTime
+}
+
+// One row per sync attempt, so the UI can say "padrón al DD/MM" honestly and
+// a failing download does not retry in a tight loop.
+model PadronSync {
+  id           String    @id @default(cuid())
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  // RUNNING | OK | FAILED | UNAVAILABLE (not configured / unreachable)
+  status       String
+  rows         Int       @default(0)
+  rejectedRows Int       @default(0)
+  error        String?   @db.Text
+
+  @@index([startedAt])
+}

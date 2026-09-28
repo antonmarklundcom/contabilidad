@@ -6,6 +6,7 @@
  */
 import { prisma } from "@/lib/prisma";
 import { ANNUAL_MONTH } from "@/lib/tax/filing-period";
+import { lookupSuppliers, normalizeRuc } from "@/lib/padron";
 
 export interface UnresolvedInvoice {
   id: string;
@@ -139,6 +140,22 @@ function makeGap(
   };
 }
 
+/**
+ * A confirmed purchase whose supplier the DNIT padrón lists as not ACTIVO
+ * (PLAN Phase 10). The padrón is today's status, not the status on the
+ * invoice date, so this is a disclosure to check — not a close blocker.
+ */
+export interface InactiveSupplierExpense {
+  id: string;
+  supplierRuc: string;
+  supplierRazonSocial: string | null;
+  numeroComprobante: string | null;
+  fecha: Date | null;
+  total: number;
+  estado: string;
+  padronAt: Date;
+}
+
 export interface ReconciliationData {
   year: number;
   /** The fiscal month, or `ANNUAL_MONTH` (0) for a whole-year review. */
@@ -155,6 +172,8 @@ export interface ReconciliationData {
    * kind of thing to explain to DNIT before DNIT asks — not a to-do.
    */
   sequenceGaps: SequenceGap[];
+  /** Not part of `clean`: see `InactiveSupplierExpense`. Empty without a padrón. */
+  inactiveSuppliers: InactiveSupplierExpense[];
   clean: boolean;
 }
 
@@ -229,6 +248,7 @@ async function buildReconciliationForRange(
   });
 
   const sequenceGaps = await buildSequenceGaps(companyId, start, end);
+  const inactiveSuppliers = await buildInactiveSuppliers(companyId, start, end);
 
   const unresolvedInvoices: UnresolvedInvoice[] = invoices.map((inv) => ({
     id: inv.id,
@@ -264,8 +284,43 @@ async function buildReconciliationForRange(
     unresolvedInvoices,
     unresolvedExpenses,
     sequenceGaps,
+    inactiveSuppliers,
     clean: unresolvedInvoices.length === 0 && unresolvedExpenses.length === 0,
   };
+}
+
+async function buildInactiveSuppliers(
+  companyId: string,
+  start: Date,
+  end: Date
+): Promise<InactiveSupplierExpense[]> {
+  const expenses = await prisma.expense.findMany({
+    where: {
+      companyId,
+      fecha: { gte: start, lt: end },
+      status: "CONFIRMED",
+      supplierRuc: { not: null },
+    },
+    orderBy: { fecha: "asc" },
+  });
+  if (expenses.length === 0) return [];
+  const padron = await lookupSuppliers(expenses.map((e) => e.supplierRuc));
+  const out: InactiveSupplierExpense[] = [];
+  for (const e of expenses) {
+    const hit = padron.get(normalizeRuc(e.supplierRuc));
+    if (!hit || hit.active) continue;
+    out.push({
+      id: e.id,
+      supplierRuc: e.supplierRuc!,
+      supplierRazonSocial: e.supplierRazonSocial,
+      numeroComprobante: e.numeroComprobante,
+      fecha: e.fecha,
+      total: Number(e.total),
+      estado: hit.estado,
+      padronAt: hit.syncedAt,
+    });
+  }
+  return out;
 }
 
 /** Reads the series a company emitted and hands them to `findSequenceGaps`. */

@@ -633,7 +633,9 @@
       "documentCounts": "{ventas} sales · {compras} purchases · {meses} of 12 months with activity",
       "openMonthly": "See the monthly VAT",
       "dueDate": "Due {date}"
-    }
+    },
+    "inactiveSuppliers": "Suppliers not active in the padrón",
+    "inactiveSuppliersHint": "Confirmed purchases whose supplier the DNIT padrón lists with a status other than ACTIVO as of {date}. That is today's status, not the one on the invoice date: check whether the purchase predates the change. It does not block the close."
   },
   "documents": {
     "title": "Documents",

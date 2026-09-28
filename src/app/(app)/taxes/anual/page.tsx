@@ -302,6 +302,31 @@ export default async function AnnualTaxPage({
             </div>
           )}
 
+          {reconciliation.inactiveSuppliers.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">{t("taxes.inactiveSuppliers")}</h3>
+              <p className="text-xs text-muted-foreground">
+                {t("taxes.inactiveSuppliersHint", {
+                  date: reconciliation.inactiveSuppliers[0].padronAt.toISOString().slice(0, 10),
+                })}
+              </p>
+              <div className="divide-y rounded-md border text-sm">
+                {reconciliation.inactiveSuppliers.map((s) => (
+                  <Link
+                    key={s.id}
+                    href={`/expenses/${s.id}`}
+                    className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-muted/50"
+                  >
+                    <span className="min-w-0 truncate">
+                      {s.supplierRazonSocial ?? s.supplierRuc} · {s.numeroComprobante ?? "—"}
+                    </span>
+                    <span className="font-medium text-amber-700">{s.estado}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           {reconciliation.sequenceGaps.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-medium">{t("taxes.sequenceGaps")}</h3>

@@ -8,7 +8,8 @@ export type JobType =
   | "cancel_dte"
   | "backup"
   | "filing_reminder"
-  | "send_report";
+  | "send_report"
+  | "padron_sync";
 
 export async function enqueueJob(
   type: JobType,

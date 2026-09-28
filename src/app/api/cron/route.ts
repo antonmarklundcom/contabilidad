@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runPendingJobs } from "@/lib/jobs/runner";
 import { enqueueNightlyBackupIfDue } from "@/lib/backup";
+import { enqueuePadronSyncIfDue } from "@/lib/padron";
 import { enqueueDueReminders } from "@/lib/notifications";
 import { precomputeMonthEndDrafts } from "@/lib/tax/precompute";
 
@@ -15,6 +16,8 @@ async function handle(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   await enqueueNightlyBackupIfDue();
+  // Monthly DNIT padrón refresh (PLAN Phase 10); a no-op without PADRON_BASE_URL.
+  await enqueuePadronSyncIfDue();
   // Compliance reminders: due filings, timbrado and certificate expiry. A
   // clean no-op when SMTP is unconfigured, so nothing is marked as sent.
   const reminders = await enqueueDueReminders();

@@ -633,7 +633,9 @@
       "documentCounts": "{ventas} ventas · {compras} compras · {meses} de 12 meses con movimiento",
       "openMonthly": "Ver el IVA mensual",
       "dueDate": "Vence el {date}"
-    }
+    },
+    "inactiveSuppliers": "Proveedores no activos en el padrón",
+    "inactiveSuppliersHint": "Compras confirmadas cuyo proveedor figura con un estado distinto de ACTIVO en el padrón de la DNIT al {date}. Es el estado de hoy, no el de la fecha de la factura: revisá si la compra es anterior al cambio. No bloquea el cierre."
   },
   "documents": {
     "title": "Documentos",
