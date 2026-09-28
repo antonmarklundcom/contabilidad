@@ -16,7 +16,7 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 | 8 | Intake channels (WhatsApp, one-time invoice link) | 8.1 **shipped** (`/e/[token]`); 8.2 (WhatsApp) still gated |
 | 9 | Public site: `contador.com.py` marketing + `sistema.contador.com.py` app split | **Code shipped** (`hosts.ts`, host-aware robots/sitemap, `src/app/marketing/` placeholders); DNS move is the owner's call. Real marketing copy lives in the separate `contador` repo (static PHP site) — see Phase 9 note |
 | 0 | **Fix-first hardening** (before any client depends on the numbers) | **Next** — see "Phase 0" below |
-| 10 | DNIT padrón sync + supplier status checks | Planned |
+| 10 | DNIT padrón sync + supplier status checks | **Shipped (code)** — needs `PADRON_BASE_URL` and a first real sync on the host |
 | 11 | RG 90 libro export in Marangatú's upload format | Planned — gated on a real sample file |
 | 12 | Accountant exception queue across all clients | Planned |
 
@@ -33,7 +33,7 @@ The shipped features are broad; these are the places where they can currently pr
    - ✅ **4a — one accountant, many companies.** `Membership` (user ↔ company, backfilled from `User.companyId` in the `membership` migration, idempotent and tested). `User.companyId` stays the default company. The active company is the httpOnly `active_company` cookie set by `switchCompany` (`src/app/(app)/actions.ts`), and `getCompanyId()` honours it **only while a membership backs it** — re-checked per request, so a hand-edited cookie or a revoked membership falls back to the default. Roles stay per user (an accountant is one in every company they belong to) so the edge middleware can keep gating without a DB query. Header switcher appears with >1 company. `audit()` records the active company. Tests: `company-scope.test.ts`, `membership-migration.test.ts`.
    - ✅ **4b — provisioning UI.** `/companies` lists the companies the user belongs to (search + pagination), with "Abrir" to switch in. `/companies/new` reuses the Settings company form in `create` mode: DV recomputed with `ruc.ts`, 8-digit timbrado, full address required, duplicate RUC refused; the creator becomes a member and lands in the new company's Settings. "Agregar usuario" (admin only) gives an existing login access, or creates one with an admin-chosen initial password (never logged). New capabilities: `companies:create` (admin, accountant), `users:manage` (admin). Rules pure in `src/lib/company-admin.ts`, tested in `tests/company-admin.test.ts`. Not built: removing a membership, a user changing their own password on first login being forced.
 5. ✅ **Stale-doc cleanup** (done with this plan update). CLAUDE.md still warned that `reopenPeriod`/`closePeriod` lack status guards — they shipped in 5.10. Remove the warning so future sessions don't re-implement it. Keep this table in sync when a phase ships.
-6. **DB-backed reconciliation test.** Phase 1 note: the findings list itself is untested against a database. Add one DB test that seeds a period and asserts the findings, since `clean` gates the close.
+6. ✅ **DB-backed reconciliation test** — already existed (`tests/reconcile.test.ts` is a DB golden test); the Phase 1 note was stale.
 
 Exit: all six done, `npm test` + lint green, migrations replay clean in CI.
 
@@ -205,15 +205,17 @@ Proposed in PR #10 (merged); this section is that plan with the mechanics correc
 
 **Status note:** items 1–4 shipped (`src/lib/hosts.ts`, `tests/host-routing.test.ts`, host-aware `robots.txt`/`sitemap.xml` route handlers, placeholder pages under `src/app/marketing/`). The public firm site is now being built separately as static HTML + PHP in the `contador` repo. Decide before the DNS move whether the apex is served by that PHP site (then delete `src/app/marketing/` and keep only the app host here) or by this app — not both.
 
-## Phase 10 — DNIT padrón sync + supplier status checks
+## Phase 10 — DNIT padrón sync + supplier status checks ✅ code shipped
 
-The highest-value missing check: a purchase from a RUC that is `CANCELADO`, `BLOQUEADO` or `SUSPENSIÓN TEMPORAL` is a credit SET can disallow, and today nothing notices.
+A purchase from a RUC that is `CANCELADO`, `BLOQUEADO` or `SUSPENSIÓN TEMPORAL` is a credit SET can question, and until now nothing noticed.
 
-1. **`DnitPadron` model** (migration): `ruc` (base, no DV) PK, `dv`, `razonSocial`, `estado`, `tipoPersona`, `syncedAt`. Global table, **not** company-scoped — it is public data, the one deliberate exception to the `companyId` rule; document that in CLAUDE.md.
-2. **`src/lib/padron.ts`** — download `ruc0.zip`…`ruc9.zip`, stream-unzip, parse the pipe-delimited rows, bulk upsert in batches (Postgres `COPY` into a staging table + swap if row-by-row is too slow). The DV in the file is re-checked with `ruc.ts`; a mismatch is logged, not trusted. Parser golden-tested on a small fixture cut from a real file (same discipline as `tests/fixtures/marangatu/`). Format is taken from a downloaded file, never assumed.
-3. **`padron_sync` job**, enqueued monthly from `/api/cron`; records the source file dates so the UI can say "padrón al DD/MM".
-4. **Checks**: on OCR, Marangatú and XML import, look up the issuer. Unknown RUC ⇒ warning; inactive estado ⇒ `NEEDS_REVIEW` + a `reconcile.ts` finding that blocks `clean`. Razón social mismatch ⇒ warning only. Also autofill supplier name in the expense form.
-5. **Network gate:** the build environment blocks `dnit.gov.py`. The job must degrade to "padrón no disponible" (no findings, no false alarms) and the owner verifies the first real sync on the Hostinger host.
+- **`DnitPadron`** (global, no `companyId` — public data, the one deliberate exception) + **`PadronSync`** (one row per attempt), in the `dnit_padron` migration.
+- **`src/lib/padron.ts`**: downloads `ruc0.zip`…`ruc9.zip` from `PADRON_BASE_URL`, parses `RUC|RAZÓN SOCIAL|DV|RUC ANTERIOR|ESTADO|`, bulk-upserts via `UNNEST`. ⚠️ That layout could not be checked against a real file here (the build proxy blocks `dnit.gov.py`), so **the parser proves it on every file**: each row's DV is recomputed with `ruc.ts` and an archive with more than 2 % failures is refused as the wrong format. All ten archives are validated before any row is written; loading then goes one archive at a time to fit a small host's memory. Latin-1 files are decoded.
+- **`padron_sync` job**, enqueued by `/api/cron` monthly after a success and at most daily after a failure (`padronSyncDue`, pure). Unset URL ⇒ `UNAVAILABLE`, no findings, no false alarms.
+- **Reconciliation** gains `inactiveSuppliers`: confirmed purchases in the period whose supplier is not `ACTIVO`, shown on `/taxes` and `/taxes/anual` with the padrón date. **Not part of `clean`** — the padrón is today's status, not the status on the invoice date, so it is a disclosure to check, not a blocker.
+- Tests: `tests/padron.test.ts` (parser, format self-test, zip, cadence, DB sync incl. the all-or-nothing refusal, reconciliation).
+- **Owner steps:** put DNIT's download folder URL in `PADRON_BASE_URL` on the host; after the first cron run check `PadronSync` shows `OK` with ~2 M rows and near-zero `rejectedRows`. If it shows `FAILED … wrong format`, send one sample line and the parser gets fixed.
+- **Not built yet:** padrón lookup at capture time (warning on the expense form, autofill of razón social) — next, small.
 
 ## Phase 11 — RG 90 libro export (Marangatú upload format)
 

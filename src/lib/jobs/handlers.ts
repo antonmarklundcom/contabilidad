@@ -23,6 +23,11 @@ export async function runJobHandler(
     case "backup":
       await createBackup();
       return;
+    case "padron_sync": {
+      const { syncPadron } = await import("@/lib/padron");
+      await syncPadron(); // records its own outcome in PadronSync
+      return;
+    }
     case "filing_reminder":
       await sendReminderEmail({
         companyId: String(payload.companyId),
