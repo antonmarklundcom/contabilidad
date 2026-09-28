@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getCompanyId } from "@/lib/company";
+import { getCompanyId, memberCompanies } from "@/lib/company";
 import { getSifenMode } from "@/lib/sifen";
 import { AppShell } from "@/components/app-shell";
 import { startJobRunner } from "@/lib/jobs/runner";
@@ -15,10 +15,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Boot the in-process job runner (no-op if already running).
   startJobRunner();
 
-  const company = await prisma.company.findUnique({
-    where: { id: await getCompanyId() },
-    select: { razonSocial: true },
-  });
+  const activeCompanyId = await getCompanyId();
+  const [company, companies] = await Promise.all([
+    prisma.company.findUnique({ where: { id: activeCompanyId }, select: { razonSocial: true } }),
+    memberCompanies(session.user.id),
+  ]);
 
   return (
     <AppShell
@@ -27,6 +28,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       userName={session.user.name ?? session.user.email ?? ""}
       userEmail={session.user.email ?? ""}
       role={normalizeRole(session.user.role)}
+      companies={companies}
+      activeCompanyId={activeCompanyId}
     >
       {children}
     </AppShell>

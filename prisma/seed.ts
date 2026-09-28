@@ -43,7 +43,7 @@ async function main() {
 
   const existingCompany = await prisma.company.findFirst();
   if (existingCompany) {
-    await prisma.user.upsert({
+    const admin = await prisma.user.upsert({
       where: { email: adminEmail },
       update: {},
       create: {
@@ -53,6 +53,7 @@ async function main() {
         companyId: existingCompany.id,
       },
     });
+    if (admin.companyId) await ensureMembership(admin.id, admin.companyId);
     console.log("Company already exists — only ensured admin user. Done.");
     return;
   }
@@ -96,7 +97,7 @@ async function main() {
     },
   });
 
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: { companyId: company.id },
     create: {
@@ -106,6 +107,7 @@ async function main() {
       companyId: company.id,
     },
   });
+  await ensureMembership(admin.id, company.id);
 
   const est = await prisma.establishment.create({
     data: {
@@ -441,3 +443,12 @@ main()
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());
+
+/** Every user is a member of their default company (PLAN Phase 0.4). */
+async function ensureMembership(userId: string, companyId: string) {
+  await prisma.membership.upsert({
+    where: { userId_companyId: { userId, companyId } },
+    update: {},
+    create: { userId, companyId },
+  });
+}

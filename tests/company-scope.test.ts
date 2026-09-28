@@ -50,3 +50,39 @@ describe("resolveCompanyId", () => {
     ).toEqual({ ok: false, reason: "no_company" });
   });
 });
+
+/** PLAN Phase 0.4 — one accountant, many companies. */
+describe("resolveCompanyId with a switched company", () => {
+  const base = { hasSession: true, sessionCompanyId: "home", companyIds: [] };
+
+  it("uses the switched-to company when a membership backs it", () => {
+    expect(
+      resolveCompanyId({ ...base, requestedCompanyId: "client7", requestedIsMember: true })
+    ).toEqual({ ok: true, companyId: "client7" });
+  });
+
+  it("ignores a cookie naming a company the user is not a member of", () => {
+    // A hand-edited cookie, or a membership revoked mid-session.
+    expect(
+      resolveCompanyId({ ...base, requestedCompanyId: "someone-else", requestedIsMember: false })
+    ).toEqual({ ok: true, companyId: "home" });
+  });
+
+  it("never lets a cookie stand in for a missing session", () => {
+    expect(
+      resolveCompanyId({
+        hasSession: false,
+        sessionCompanyId: null,
+        companyIds: ["a", "b"],
+        requestedCompanyId: "a",
+        requestedIsMember: true,
+      })
+    ).toEqual({ ok: false, reason: "ambiguous" });
+  });
+
+  it("does not rescue a user with no default company via the cookie alone unless a membership backs it", () => {
+    expect(
+      resolveCompanyId({ hasSession: true, sessionCompanyId: null, companyIds: [], requestedCompanyId: "x", requestedIsMember: false })
+    ).toEqual({ ok: false, reason: "no_company_for_user" });
+  });
+});

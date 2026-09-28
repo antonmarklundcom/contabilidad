@@ -735,5 +735,8 @@
       "failed": "No se pudo generar el enlace.",
       "noPoint": "Configurá un establecimiento y un punto de expedición antes de generar enlaces."
     }
+  },
+  "company": {
+    "switch": "Cambiar de empresa"
   }
 }

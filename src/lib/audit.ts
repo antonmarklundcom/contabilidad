@@ -12,6 +12,11 @@ export async function audit(
 ): Promise<void> {
   try {
     const session = await getServerSession(authOptions);
+    // The ACTIVE company (Phase 0.4), not the default one the session carries.
+    const { getCompanyId } = await import("@/lib/company");
+    const companyId = session?.user
+      ? await getCompanyId().catch(() => session.user.companyId ?? null)
+      : null;
     await prisma.auditLog.create({
       data: {
         action,
@@ -19,7 +24,7 @@ export async function audit(
         entityId,
         detail: detail as Prisma.InputJsonValue | undefined,
         userId: session?.user?.id ?? null,
-        companyId: session?.user?.companyId ?? null,
+        companyId,
       },
     });
   } catch (err) {
