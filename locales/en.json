@@ -735,5 +735,8 @@
       "failed": "The link could not be generated.",
       "noPoint": "Set up an establishment and an expedition point before generating links."
     }
+  },
+  "company": {
+    "switch": "Switch company"
   }
 }

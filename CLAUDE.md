@@ -4,7 +4,7 @@ Context for future Claude Code sessions. Read this before making changes.
 
 ## What this is
 
-Paraguayan electronic invoicing (SIFEN / DNIT DTE) + automatic accounting, as a single Next.js 15 app. **Multi-tenant**: every business table has `companyId`, and all queries filter by it via `getCompanyId()` (`src/lib/company.ts`), which resolves to the *session's* company. A session-less caller (job runner, `/api/cron`, scripts) gets the sole company when there is exactly one and is refused when there are several — background work passes `companyId` explicitly (e.g. the DTE lifecycle takes it from the invoice). Never reintroduce a "first company in the database" fallback.
+Paraguayan electronic invoicing (SIFEN / DNIT DTE) + automatic accounting, as a single Next.js 15 app. **Multi-tenant**: every business table has `companyId`, and all queries filter by it via `getCompanyId()` (`src/lib/company.ts`), which resolves to the *session's* company. A session-less caller (job runner, `/api/cron`, scripts) gets the sole company when there is exactly one and is refused when there are several — background work passes `companyId` explicitly (e.g. the DTE lifecycle takes it from the invoice). Never reintroduce a "first company in the database" fallback. A user may belong to several companies (`Membership`); the active one is the `active_company` cookie, honoured by `getCompanyId()` only while a membership row backs it — never read that cookie anywhere else. Roles are per user, not per membership.
 
 ## Stack
 

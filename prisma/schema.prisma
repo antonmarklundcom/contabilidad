@@ -26,7 +26,25 @@ model User {
   updatedAt    DateTime  @updatedAt
   company      Company?  @relation(fields: [companyId], references: [id])
   auditLogs    AuditLog[]
+  memberships  Membership[]
 
+  @@index([companyId])
+}
+
+// Which companies a user may open (PLAN Phase 0.4). `User.companyId` stays the
+// user's DEFAULT company; a membership lets one accountant work across many
+// clients. Roles stay on the user (an accountant is one in every company they
+// belong to) so the edge middleware can keep gating by role without a query.
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  companyId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
   @@index([companyId])
 }
 
@@ -68,6 +86,7 @@ model Company {
   updatedAt            DateTime @updatedAt
 
   users            User[]
+  memberships      Membership[]
   establishments   Establishment[]
   clients          Client[]
   products         Product[]

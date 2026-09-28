@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { switchCompany } from "@/app/(app)/actions";
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
@@ -58,9 +59,14 @@ export function AppShell({
   userName,
   userEmail,
   role,
+  companies,
+  activeCompanyId,
   children,
 }: {
   companyName: string;
+  /** Companies the user belongs to; a switcher appears when there are several. */
+  companies: { id: string; razonSocial: string; ruc: string; dv: string }[];
+  activeCompanyId: string;
   sifenMode: string;
   userName: string;
   userEmail: string;
@@ -70,6 +76,15 @@ export function AppShell({
   const { t } = useI18n();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const router = useRouter();
+  const [switching, setSwitching] = useState(false);
+
+  async function onSwitch(companyId: string) {
+    setSwitching(true);
+    const res = await switchCompany(companyId);
+    setSwitching(false);
+    if (res.ok) router.refresh();
+  }
 
   const nav = (
     <nav className="flex flex-1 flex-col gap-0.5 p-3">
@@ -141,7 +156,23 @@ export function AppShell({
             <Menu className="h-5 w-5" />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{companyName}</p>
+            {companies.length > 1 ? (
+              <select
+                aria-label={t("company.switch")}
+                className="max-w-full truncate rounded-md border bg-card px-2 py-1 text-sm font-medium"
+                value={activeCompanyId}
+                disabled={switching}
+                onChange={(e) => void onSwitch(e.target.value)}
+              >
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.razonSocial} — {c.ruc}-{c.dv}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="truncate text-sm font-medium">{companyName}</p>
+            )}
           </div>
           <span
             className={cn(
