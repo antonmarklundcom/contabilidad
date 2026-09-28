@@ -18,7 +18,7 @@ What we build next, in order, and why. Companion docs: `ARCHITECTURE.md` (how it
 | 0 | **Fix-first hardening** (before any client depends on the numbers) | **Next** — see "Phase 0" below |
 | 10 | DNIT padrón sync + supplier status checks | **Shipped (code)** — needs `PADRON_BASE_URL` and a first real sync on the host |
 | 11 | RG 90 libro export in Marangatú's upload format | Planned — gated on a real sample file |
-| 12 | Accountant exception queue across all clients | Planned |
+| 12 | Accountant exception queue across all clients | **Shipped (MVP)** — `/queue`; per-item review-time metric still open |
 
 **Direction (2026-09):** the product is an *accountant operating system* first and a DIY tool second. In Paraguay a freelance contador costs ~₲100–150k/month, so a self-service SaaS saves the client almost nothing and removes the person who carries the liability. The margin is in making one accountant handle hundreds of clients: the client sends receipts, the machine books and checks everything, and a human only looks at exceptions. Every phase from 0 onward is judged by "does this cut accountant minutes per client per month without adding risk?". Sold two ways: our own firm (via the `contador.com.py` site) and licensed to other estudios per client. Market figures quoted in planning notes (padrón size, fine amounts, share of PJ RUCs) are secondary-source and unverified — do not put them in UI or marketing copy until checked against DNIT.
 
@@ -226,14 +226,15 @@ Today the libros export as CSV/XLSX for humans. The accountant still re-keys or 
 3. `/api/export/rg90?year&month&libro=` + a button on `/books` and on the `/taxes` close screen. Golden-file tests.
 4. Pre-export validation reuses `reconcile.ts`: refuse (with the findings list) if the period is not clean.
 
-## Phase 12 — Accountant exception queue
+## Phase 12 — Accountant exception queue ✅ MVP shipped
 
-The screen that turns "60 minutes per client" into "5". Depends on Phase 0.4 (one accountant ↔ many companies).
+The screen that turns "60 minutes per client" into "5".
 
-1. **`/queue`** (accountant/admin only): one list across every company the user belongs to, of items needing a human — low-confidence OCR fields, `NEEDS_REVIEW` expenses, `PENDING` deducibility, padrón failures (Phase 10), CDC `mismatch`, duplicate suspects, periods with a draft ready to close, and upcoming deadlines. Each row names the company.
-2. **High-density review view:** receipt image beside the parsed fields, amber for low confidence, keyboard driven (j/k next/prev, a approve, e edit, d deducibility). Approving writes through the *same* server actions as the per-company screens (with `allowed()` and `audit()`), just with the company passed explicitly and checked against membership.
-3. **Per-client month status board:** company × month grid (receipts in / exceptions open / draft ready / closed / submitted / paid). This is the firm's daily driver and the demo for licensing to other estudios.
-4. Metric: store review time per item (`audit` timestamps) so "minutes per client" is measured, not claimed.
+- **`/queue`** (`queue:read`: admin + accountant; never `client`). `src/lib/review-queue.ts` builds one list over **every company the user has a Membership in, and no other** (DB-tested): unreviewed expenses, low-confidence OCR reads (shared `LOW_CONFIDENCE` in `src/lib/confidence.ts`, the same threshold the form paints amber), duplicate suspects, CDC `mismatch`/`rejected`, and — while still unreviewed — suppliers the padrón lists as not `ACTIVO` (this is the Phase 10 capture-time check). Sorted most serious first. Capped at 500 with a notice.
+- **Status board** per client: open items + next IVA deadline from `tax/deadline.ts`, overdue in red, ≤ 10 days amber; clients needing something sort first.
+- **Keyboard**: `j`/`k` move, `Enter` opens. Opening switches into the item's company (membership re-checked server-side) and lands on the normal expense screen, so every decision still goes through the existing actions with `allowed()` + `audit()`. The queue itself writes nothing.
+- Tests: `tests/review-queue.test.ts` (classification order, padrón only before review, unknown supplier never flagged, access matrix, DB membership scoping).
+- **Not built:** side-by-side image review *inside* the queue (today it opens the existing review screen), per-item review-time metric, month × company grid with closed/submitted/paid. Build once real usage shows which matters.
 
 ## Phase 8.2 revisited — WhatsApp intake
 
